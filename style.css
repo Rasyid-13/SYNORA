@@ -1,0 +1,15 @@
+/* Menghilangkan blue tap highlight di Android */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sembunyikan elemen Alpine sebelum dimuat sepenuhnya (mencegah kedipan) */
+[x-cloak] { 
+  display: none !important; 
+}
+
+/* Kustomisasi scrollbar agar rapi */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent; 
+}
