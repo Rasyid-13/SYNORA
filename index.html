@@ -4,19 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>SYNORA</title>
-    <!-- PWA Persyaratan -->
+  
+  <!-- PWA Manifest & Meta -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
   <link rel="apple-touch-icon" href="logo.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased overflow-hidden" x-data="synoraApp()">
 
-  <!-- ================= 1. LOADING SCREEN ================= -->
+  <!-- 1. LOADING SCREEN -->
   <div x-show="appState === 'loading'" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
     <div class="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] mb-6 flex items-center justify-center overflow-hidden animate-pulse border border-gray-50">
       <img src="logo.png" onerror="this.style.display='none'" class="w-full h-full object-cover" alt="SYNORA Logo">
@@ -25,7 +28,7 @@
     <p class="mt-4 font-medium text-gray-500">Connecting to SYNORA...</p>
   </div>
 
-  <!-- ================= 2. LOGIN SCREEN ================= -->
+  <!-- 2. LOGIN SCREEN -->
   <div x-show="appState === 'login'" x-cloak class="fixed inset-0 bg-white z-[90] flex flex-col items-center justify-center p-6">
     <div class="w-full max-w-sm flex flex-col items-center">
       <div class="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] mb-6 flex items-center justify-center overflow-hidden border border-gray-50">
@@ -60,12 +63,11 @@
     </div>
   </div>
 
-  <!-- ================= 3. ORG SELECTOR / ONBOARDING ================= -->
+  <!-- 3. ORG SELECTOR -->
   <div x-show="appState === 'select_org'" x-cloak class="fixed inset-0 bg-gray-50 z-[80] overflow-y-auto pt-16 px-4 pb-10">
     <h2 class="text-3xl font-bold mb-2" x-text="myOrganizations.length > 0 ? 'Your Organizations' : 'Almost there!'"></h2>
     <p class="text-gray-500 mb-6" x-text="myOrganizations.length > 0 ? 'Choose a family or organization to enter.' : 'You don\'t belong to any organization yet.'"></p>
     
-    <!-- DAFTAR ORGANISASI YANG SUDAH DIIKUTI (FITUR SWITCH) -->
     <div x-show="myOrganizations.length > 0" class="mb-8 space-y-3">
        <template x-for="org in myOrganizations" :key="org.id">
          <button @click="selectOrg(org.id, org.name)" class="w-full bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 active:scale-95 transition text-left">
@@ -77,7 +79,6 @@
             <div class="text-gray-300">➔</div>
          </button>
        </template>
-       
        <div class="flex items-center gap-4 my-6 opacity-60">
           <div class="h-px bg-gray-300 flex-1"></div>
           <span class="text-[10px] font-bold text-gray-500 uppercase">OR ADD NEW</span>
@@ -85,7 +86,6 @@
        </div>
     </div>
 
-    <!-- BUAT & JOIN BARU -->
     <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6">
       <h3 class="font-bold text-xl mb-1">Create Family</h3>
       <p class="text-sm text-gray-500 mb-4">Start your own digital home.</p>
@@ -108,7 +108,7 @@
     </div>
   </div>
 
-  <!-- ================= 4. MAIN APP ================= -->
+  <!-- 4. MAIN APP -->
   <div x-show="appState === 'main'" x-cloak class="flex flex-col h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
     
     <header class="bg-white px-5 py-4 flex justify-between items-center shadow-sm z-30 shrink-0 relative">
@@ -194,6 +194,7 @@
                <p class="text-xs opacity-80 mb-1">Total Organization Cash</p>
                <h2 class="text-3xl font-bold tracking-tight" x-text="formatCurrency(totalCash)">Rp 0</h2>
              </div>
+             <!-- Tombol Dinamis Berdasarkan Sub-Tab dan Izin -->
              <button x-show="financeSubTab === 'cashflow' ? permissions.edit_finance : permissions.manage_budget" @click="showFinanceModal = true" class="bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-2xl w-12 h-12 flex items-center justify-center text-2xl font-light backdrop-blur-md transition active:scale-95 shadow-sm">+</button>
           </div>
           <div class="flex gap-3 mt-5 pt-4 border-t border-white/20 relative z-10">
@@ -275,7 +276,6 @@
                 <p class="font-bold text-sm text-gray-800 flex items-center gap-2">
                   <span x-text="member.uid === userUid ? (member.name || userName || 'You') + ' (You)' : (member.name || member.short_id || 'Member')"></span>
                   <span x-show="member.role_name === 'Head'" class="bg-yellow-100 text-yellow-700 text-[9px] px-1.5 py-0.5 rounded font-bold">HEAD</span>
-                  <!-- Tag Extended Family -->
                   <span x-show="member.role_name === 'Extended Family'" class="bg-purple-100 text-purple-700 text-[9px] px-1.5 py-0.5 rounded font-bold">EXTENDED</span>
                 </p>
                 <p class="text-xs text-gray-400" x-text="member.role_name"></p>
@@ -313,6 +313,14 @@
             </div>
             <span class="text-gray-400">➔</span>
           </button>
+          <!-- Tombol Aktivasi Notifikasi -->
+          <button @click="requestNotificationPermission()" class="w-full flex items-center justify-between p-4 border-b border-gray-50 active:bg-gray-50 text-left transition">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🔔</span>
+              <span class="font-medium text-gray-700">Enable Notifications</span>
+            </div>
+            <span class="text-gray-400">➔</span>
+          </button>
           <button @click="logout()" class="w-full flex items-center justify-between p-4 active:bg-red-50 text-left transition text-red-600">
             <div class="flex items-center gap-3">
               <span class="text-xl">🚪</span>
@@ -323,9 +331,7 @@
       </section>
     </main>
 
-    <!-- ================= MODALS TAMBAHAN ================= -->
-    
-    <!-- Modal Merge Family (FITUR BARU) -->
+    <!-- ================= MODALS ================= -->
     <div x-show="showMergeModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
       <div @click.away="showMergeModal = false" x-show="showMergeModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100">
         <div class="flex justify-between items-center mb-6">
@@ -341,10 +347,6 @@
       </div>
     </div>
 
-    <!-- Modals lainnya (Profile, Permissions, Notebook, Finance, Member) tetap ada di bawah ini -->
-    <!-- (Disalin dari kode sebelumnya agar tidak memenuhi prompt, pastikan tetap diletakkan di bagian ini sebelum <nav>) -->
-    
-    <!-- Modal Edit Profile -->
     <div x-show="showProfileModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
       <div @click.away="showProfileModal = false" x-show="showProfileModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
@@ -377,7 +379,6 @@
       </div>
     </div>
 
-    <!-- Modal Permissions -->
     <div x-show="showPermissionsModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
       <div @click.away="showPermissionsModal = false" x-show="showPermissionsModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
@@ -421,7 +422,6 @@
       </div>
     </div>
 
-    <!-- Modal Notebook -->
     <div x-show="showNotebookModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
       <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0">
         <div class="flex items-center gap-3">
@@ -451,7 +451,6 @@
       </div>
     </div>
 
-    <!-- Modals Finance -->
     <div x-show="showFinanceModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
       <div @click.away="showFinanceModal = false" x-show="showFinanceModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
@@ -482,7 +481,6 @@
       </div>
     </div>
 
-    <!-- Modal Member -->
     <div x-show="showMemberModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
       <div @click.away="showMemberModal = false" x-show="showMemberModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
@@ -497,7 +495,7 @@
           <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Role in Organization</label>
           <input x-model="memberForm.role" type="text" placeholder="e.g. Manager, Child" class="w-full px-4 py-4 rounded-xl border outline-none bg-gray-50 focus:bg-white font-bold">
         </div>
-        <button @click="saveMember()" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl active:scale-95 shadow-md mb-3" x-text="memberModalMode === 'add' ? 'Add Member' : 'Save Changes'"></button>
+        <button @click="saveMember()" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl active:scale-95 transition shadow-md mb-3" x-text="memberModalMode === 'add' ? 'Add Member' : 'Save Changes'"></button>
         <button x-show="memberModalMode === 'edit'" @click="removeMember()" class="w-full bg-red-50 text-red-600 font-bold py-4 rounded-xl active:scale-95">Remove Member</button>
       </div>
     </div>
@@ -525,15 +523,5 @@
   </div>
 
   <script type="module" src="js/app.js"></script>
-    <!-- Daftarkan Service Worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then((reg) => console.log('Service Worker Berhasil Terdaftar', reg))
-          .catch((err) => console.log('Gagal mendaftar Service Worker', err));
-      });
-    }
-  </script>
 </body>
 </html>
