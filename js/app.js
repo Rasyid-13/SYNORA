@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, updateDoc, writeBatch, onSnapshot, collection, add
 
 Alpine.data('synoraApp', () => ({
     
-    appState: 'loading', // 'loading', 'login', 'select_org', 'main'
+    appState: 'loading', 
     userUid: null,
     userShortId: '',
     userName: '', 
@@ -18,7 +18,6 @@ Alpine.data('synoraApp', () => ({
     password: '',
     confirmationResult: null,
 
-    // ORG SELECTION STATE
     myOrganizations: [], 
     newFamilyName: '',
     joinOrgId: '',
@@ -60,11 +59,9 @@ Alpine.data('synoraApp', () => ({
     notes: [],
     noteForm: { id: null, title: '', content: '' },
 
-    // MERGE STATE
     showMergeModal: false,
     mergeTargetId: '',
 
-    // MEMORY MANAGEMENT (Menghindari kebocoran data antar Org)
     unsubChat: null,
     unsubFinance: null,
     unsubMembers: null,
@@ -133,7 +130,6 @@ Alpine.data('synoraApp', () => ({
         }
     },
 
-    // --- CHECK STATUS & LOAD ORGANIZATIONS ---
     async checkUserStatus(uid, contact) {
         const userRef = doc(db, "users", uid);
         const userSnap = await getDoc(userRef);
@@ -144,13 +140,9 @@ Alpine.data('synoraApp', () => ({
             this.userName = userData.name || ""; 
             
             if (userData.joined_organizations && userData.joined_organizations.length > 0) {
-                // Load My Organizations List First
                 await this.loadMyOrganizationsList(userData.joined_organizations);
-                
-                // Auto-login to the last used organization (if exists in list) or pick the first one
                 const savedOrg = localStorage.getItem('last_active_org');
                 const targetOrgId = userData.joined_organizations.includes(savedOrg) ? savedOrg : userData.joined_organizations[0];
-                
                 await this.selectOrg(targetOrgId);
             } else {
                 this.appState = 'select_org'; 
@@ -176,7 +168,6 @@ Alpine.data('synoraApp', () => ({
         }
     },
 
-    // --- SWITCH ORGANIZATION LOGIC ---
     openOrgSelector() {
         this.appState = 'select_org';
     },
@@ -190,7 +181,6 @@ Alpine.data('synoraApp', () => ({
         if(this.unsubPerms) { this.unsubPerms(); this.unsubPerms = null; }
         if(this.unsubNotebook) { this.unsubNotebook(); this.unsubNotebook = null; }
         
-        // Bersihkan state UI untuk Org baru
         this.messages = [];
         this.transactions = [];
         this.members = [];
@@ -229,11 +219,11 @@ Alpine.data('synoraApp', () => ({
             uid: this.userUid, role_name: "Head", name: this.userName || "Head", joined_at: new Date(), 
             permissions: { view_finance: true, edit_finance: true, manage_budget: true, manage_members: true, edit_permissions: true, merge_family: true, view_notebook: true, edit_notebook: true }
         });
-        batch.update(doc(db, "users", this.userUid), { joined_organizations: arrayUnion(orgId) });
+        batch.update(doc(db, "users", this.userUid), { joined_organizations: [orgId] });
 
         try {
             await batch.commit(); 
-            this.myOrganizations.push({ id: orgId, name: this.newFamilyName }); // Update Local List
+            this.myOrganizations.push({ id: orgId, name: this.newFamilyName });
             await this.selectOrg(orgId, this.newFamilyName);
         } catch (error) { alert("Terjadi kesalahan sistem."); }
     },
@@ -255,12 +245,11 @@ Alpine.data('synoraApp', () => ({
             batch.update(doc(db, "users", this.userUid), { joined_organizations: arrayUnion(orgId) });
 
             await batch.commit(); 
-            this.myOrganizations.push({ id: orgId, name: orgSnap.data().name }); // Update Local List
+            this.myOrganizations.push({ id: orgId, name: orgSnap.data().name });
             await this.selectOrg(orgId, orgSnap.data().name);
         } catch (error) { alert("Gagal bergabung."); }
     },
 
-    // --- MERGE FAMILY LOGIC ---
     async mergeFamily() {
         const targetOrgId = this.mergeTargetId.trim().toUpperCase();
         if(!targetOrgId || !targetOrgId.startsWith('ORG-')) return alert("Format ID salah!");
@@ -280,13 +269,13 @@ Alpine.data('synoraApp', () => ({
                 const memberData = memberDoc.data();
                 const targetUid = memberData.uid;
 
-                if(this.members.find(m => m.uid === targetUid)) return; // Skip if already inside
+                if(this.members.find(m => m.uid === targetUid)) return; 
 
                 batch.set(doc(db, "organizations", this.activeOrg.id, "members", targetUid), {
                     uid: targetUid,
                     short_id: memberData.short_id || "USR",
                     name: memberData.name || "Member",
-                    role_name: "Extended Family", // Label otomatis hasil merge
+                    role_name: "Extended Family", 
                     joined_at: serverTimestamp(),
                     permissions: { view_finance: true, edit_finance: false, edit_notebook: false, view_notebook: true, edit_permissions: false, manage_members: false }
                 });
@@ -309,7 +298,6 @@ Alpine.data('synoraApp', () => ({
         }
     },
 
-    // --- PROFILE & PERMISSIONS ---
     async openProfileModal() {
         const userSnap = await getDoc(doc(db, "users", this.userUid));
         const data = userSnap.data();
@@ -351,7 +339,7 @@ Alpine.data('synoraApp', () => ({
                 }
             } catch (authError) {
                 console.warn("Auth Update Error:", authError);
-                authWarning = "\n\nCatatan: Nama dan Role telah tersimpan! Namun, pergantian Login Email/Password ditolak Firebase (Perlu verifikasi email atau login ulang).";
+                authWarning = "\n\nCatatan: Nama dan Role telah tersimpan! Namun, pergantian Login Email/Password ditolak Firebase.";
             }
 
             alert("Proses Selesai!" + authWarning);
@@ -390,7 +378,6 @@ Alpine.data('synoraApp', () => ({
         }
     },
 
-    // --- NOTEBOOK LOGIC ---
     openNotebook() {
         if (!this.permissions.view_notebook) return alert("Anda dilarang mengakses Notebook organisasi.");
         this.showNotebookModal = true;
@@ -402,9 +389,21 @@ Alpine.data('synoraApp', () => ({
         if(this.unsubNotebook) this.unsubNotebook();
         const notebookRef = collection(db, 'organizations', orgId, 'notebook');
         const q = query(notebookRef, orderBy('updated_at', 'desc'));
+        
+        let isInitialNoteLoad = true;
         this.unsubNotebook = onSnapshot(q, (snapshot) => {
+            const oldLength = this.notes.length;
             this.notes = [];
             snapshot.forEach((doc) => { this.notes.push({ id: doc.id, ...doc.data() }); });
+
+            // Notifikasi Catatan Baru/Edit dari Orang Lain
+            if (!isInitialNoteLoad && this.notes.length > oldLength) {
+                const latestNote = this.notes[0];
+                if (latestNote && latestNote.updated_by !== this.userUid) {
+                    this.showLocalNotification("Notebook Organisasi", `Catatan baru: "${latestNote.title}"`);
+                }
+            }
+            isInitialNoteLoad = false;
         });
     },
 
@@ -436,12 +435,51 @@ Alpine.data('synoraApp', () => ({
         } catch(e) { alert("Gagal menghapus."); }
     },
 
-    // --- CORE LOGIC (Chat, Finance, Member) ---
+    // --- NOTIFICATION SYSTEM (CHAT, FINANCE, NOTEBOOK) ---
+    async requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            return alert("Browser Anda tidak menduung Notifikasi.");
+        }
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            alert("Notifikasi berhasil diaktifkan!");
+        } else {
+            alert("Izin notifikasi ditolak.");
+        }
+    },
+
+    showLocalNotification(title, bodyText) {
+        if (Notification.permission === 'granted') {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.showNotification(title, {
+                    body: bodyText,
+                    icon: 'logo.png',
+                    badge: 'logo.png',
+                    vibrate: [200, 100, 200]
+                });
+            });
+        }
+    },
+
+    // --- LISTENERS ---
     listenToChat(orgId) {
+        let isInitialChatLoad = true;
         const q = query(collection(db, 'chats', 'CHAT-' + orgId, 'messages'), orderBy('timestamp', 'asc'));
+        
         this.unsubChat = onSnapshot(q, (snapshot) => {
+            const oldLength = this.messages.length;
             this.messages = [];
             snapshot.forEach((doc) => { this.messages.push({ id: doc.id, ...doc.data() }); });
+            
+            // Notifikasi Chat Baru dari Orang Lain
+            if (!isInitialChatLoad && this.messages.length > oldLength) {
+                const latestMsg = this.messages[this.messages.length - 1];
+                if (latestMsg && latestMsg.sender_id !== this.userUid) {
+                    this.showLocalNotification(`Pesan dari ${this.getMemberName(latestMsg.sender_id)}`, latestMsg.text);
+                }
+            }
+            isInitialChatLoad = false;
+
             setTimeout(() => {
                 const container = document.getElementById('chat-container');
                 if(container) container.scrollTop = container.scrollHeight;
@@ -461,8 +499,11 @@ Alpine.data('synoraApp', () => ({
     },
 
     listenToFinance(orgId) {
+        let isInitialFinanceLoad = true;
         const q = query(collection(db, 'organizations', orgId, 'finance_transactions'), orderBy('timestamp', 'desc'));
+        
         this.unsubFinance = onSnapshot(q, (snapshot) => {
+            const oldLength = this.transactions.length;
             this.transactions = [];
             let calculatedTotal = 0; 
             snapshot.forEach((doc) => {
@@ -471,6 +512,15 @@ Alpine.data('synoraApp', () => ({
                 calculatedTotal += data.type === 'income' ? data.amount : -data.amount;
             });
             this.totalCash = calculatedTotal;
+
+            // Notifikasi Transaksi Keuangan Baru dari Orang Lain
+            if (!isInitialFinanceLoad && this.transactions.length > oldLength) {
+                const latestTx = this.transactions[0];
+                if (latestTx && latestTx.created_by !== this.userUid) {
+                    this.showLocalNotification("Keuangan Organisasi", `Transaksi ${latestTx.type}: ${latestTx.desc} (${this.formatCurrency(latestTx.amount)})`);
+                }
+            }
+            isInitialFinanceLoad = false;
         });
     },
 
@@ -621,7 +671,6 @@ Alpine.data('synoraApp', () => ({
     
     switchTab(tabName) { this.activeTab = tabName; localStorage.setItem('last_active_tab', tabName); },
     
-    // --- HELPER UNTUK NAMA CHAT YANG DINAMIS ---
     getMemberName(uid) {
         const member = this.members.find(m => m.uid === uid);
         return member ? (member.name || member.short_id || "Member") : "Member";
