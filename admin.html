@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SYNORA - Super Admin</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#9333ea">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style> [x-cloak] { display: none !important; } </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased overflow-hidden" x-data="adminPanel()">
+
+  <!-- LOADING SCREEN -->
+  <div x-show="appState === 'loading'" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+    <div class="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+    <p class="mt-4 font-medium text-gray-500">Memverifikasi Otoritas Admin...</p>
+  </div>
+
+  <div x-show="appState === 'main'" x-cloak class="flex flex-col h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
+    
+    <!-- HEADER -->
+    <header class="bg-purple-700 px-5 py-4 flex justify-between items-center shadow-md z-30 shrink-0 text-white relative">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="text-white hover:text-purple-200 transition active:scale-95 text-xl font-bold">&larr;</a>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">Super Admin</h1>
+          <p class="text-[10px] text-purple-200 font-mono uppercase">Control Center</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- TABS -->
+    <div class="flex gap-2 p-4 bg-white border-b border-gray-100 shrink-0 overflow-x-auto hide-scrollbar">
+        <button @click="activeTab = 'subscriptions'" :class="activeTab === 'subscriptions' ? 'bg-purple-100 text-purple-700 font-bold shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="px-4 py-2 rounded-xl text-sm transition whitespace-nowrap">Aktivasi Langganan</button>
+        <button @click="activeTab = 'orgs'" :class="activeTab === 'orgs' ? 'bg-purple-100 text-purple-700 font-bold shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="px-4 py-2 rounded-xl text-sm transition whitespace-nowrap">Kelola Organisasi</button>
+        <button @click="activeTab = 'promos'" :class="activeTab === 'promos' ? 'bg-purple-100 text-purple-700 font-bold shadow-sm' : 'text-gray-500 hover:bg-gray-50'" class="px-4 py-2 rounded-xl text-sm transition whitespace-nowrap">Kode Promo</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 overflow-y-auto p-4 relative z-10 space-y-6">
+
+      <!-- TAB 1: AKTIVASI LANGGANAN -->
+      <section x-show="activeTab === 'subscriptions'">
+        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <h3 class="font-bold text-lg mb-1 text-gray-800">Aktivasi Organisasi Baru</h3>
+            <p class="text-xs text-gray-500 mb-6">Gunakan menu ini setelah menerima bukti transfer dari pengguna di WhatsApp.</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">UID Pengguna (Pemilik)</label>
+                    <input x-model="newOrg.uid" type="text" placeholder="Paste UID User dari Firebase..." class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">Nama Organisasi</label>
+                    <input x-model="newOrg.name" type="text" placeholder="Nama organisasi klien..." class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Tipe (Tier)</label>
+                        <select x-model="newOrg.type" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none">
+                            <option value="Campus">Campus</option>
+                            <option value="Esports">Esports</option>
+                            <option value="Traders">Traders</option>
+                            <option value="Business">Business</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 mb-1 block">Durasi Langganan</label>
+                        <select x-model="newOrg.durationMonths" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none">
+                            <option value="1">1 Bulan</option>
+                            <option value="3">3 Bulan</option>
+                            <option value="6">6 Bulan</option>
+                            <option value="12">1 Tahun (12 Bulan)</option>
+                        </select>
+                    </div>
+                </div>
+                <button @click="createPremiumOrg()" class="w-full bg-purple-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition mt-2">Buat & Aktifkan Organisasi</button>
+            </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: KELOLA ORGANISASI (LOCKING SYSTEM) -->
+      <section x-show="activeTab === 'orgs'" x-cloak>
+         <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-gray-800">Daftar Organisasi</h3>
+            <button @click="loadOrgs()" class="text-purple-600 text-xs font-bold bg-purple-50 px-3 py-1.5 rounded-lg">🔄 Refresh</button>
+         </div>
+         <div class="space-y-3">
+             <template x-for="org in organizations" :key="org.id">
+                 <div class="bg-white p-4 rounded-2xl shadow-sm border flex flex-col gap-3" :class="isLocked(org.expires_at, org.status) ? 'border-red-200' : 'border-gray-100'">
+                     <div class="flex justify-between items-start">
+                         <div>
+                             <h4 class="font-bold text-gray-800" x-text="org.name"></h4>
+                             <p class="text-xs text-gray-500 uppercase font-mono" x-text="org.id + ' • ' + org.type"></p>
+                         </div>
+                         <span class="text-[10px] font-bold px-2 py-1 rounded" :class="isLocked(org.expires_at, org.status) ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'" x-text="isLocked(org.expires_at, org.status) ? 'LOCKED' : 'ACTIVE'"></span>
+                     </div>
+                     <div class="bg-gray-50 p-2 rounded-lg text-[10px] text-gray-600">
+                         <p>Berlaku s/d: <span class="font-bold" x-text="formatDate(org.expires_at)"></span></p>
+                     </div>
+                     <div class="flex gap-2 mt-1">
+                         <button @click="openRenewModal(org)" class="flex-1 bg-purple-50 text-purple-700 py-2 rounded-lg text-xs font-bold active:scale-95">Perpanjang</button>
+                         <button @click="toggleLock(org)" class="flex-1 py-2 rounded-lg text-xs font-bold active:scale-95" :class="isLocked(org.expires_at, org.status) ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'" x-text="isLocked(org.expires_at, org.status) ? 'Buka Kunci' : 'Kunci Paksa'"></button>
+                     </div>
+                 </div>
+             </template>
+         </div>
+      </section>
+
+      <!-- TAB 3: PROMO CODES -->
+      <section x-show="activeTab === 'promos'" x-cloak>
+          <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6">
+              <h3 class="font-bold text-gray-800 mb-4">Buat Kode Promo Baru</h3>
+              <div class="space-y-3">
+                  <input x-model="newPromo.code" type="text" placeholder="Misal: MERDEKA50" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 font-bold uppercase outline-none">
+                  <div class="grid grid-cols-2 gap-3">
+                      <input x-model="newPromo.discount" type="number" placeholder="Diskon (%)" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 outline-none">
+                      <input x-model="newPromo.maxUsage" type="number" placeholder="Max Kuota" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 outline-none">
+                  </div>
+                  <div>
+                      <label class="text-xs font-bold text-gray-500 mb-1 block">Berlaku Sampai (Opsional)</label>
+                      <input x-model="newPromo.expiresAt" type="date" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 outline-none">
+                  </div>
+                  <button @click="createPromo()" class="w-full bg-purple-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition mt-2">Simpan Kode</button>
+              </div>
+          </div>
+
+          <h3 class="font-bold text-gray-800 mb-3">Kode Promo Aktif</h3>
+          <div class="space-y-3">
+              <template x-for="promo in promoCodes" :key="promo.id">
+                  <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                      <div>
+                          <h4 class="font-black text-purple-600 text-lg tracking-wider" x-text="promo.code"></h4>
+                          <p class="text-xs text-gray-500" x-text="'Diskon: ' + promo.discount + '% • Terpakai: ' + (promo.used || 0) + '/' + promo.maxUsage"></p>
+                          <p class="text-[10px] text-gray-400 mt-1 font-bold" :class="isPromoExpired(promo.expiresAt) ? 'text-red-500' : ''" x-text="promo.expiresAt ? (isPromoExpired(promo.expiresAt) ? '❌ Sudah Expired' : '⏳ Exp: ' + formatDate(promo.expiresAt)) : '✅ Tanpa Batas Waktu'"></p>
+                      </div>
+                      <button @click="deletePromo(promo.id)" class="text-red-500 bg-red-50 p-2 rounded-xl active:scale-95">🗑️</button>
+                  </div>
+              </template>
+          </div>
+      </section>
+
+    </main>
+
+    <!-- Modal Perpanjangan Langganan -->
+    <div x-show="showRenewModal" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-1">Perpanjang Masa Aktif</h3>
+            <p class="text-xs text-gray-500 mb-4" x-text="'Target: ' + selectedOrgForRenew?.name"></p>
+            
+            <select x-model="renewMonths" class="w-full p-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none mb-4">
+                <option value="1">Tambah 1 Bulan</option>
+                <option value="3">Tambah 3 Bulan</option>
+                <option value="6">Tambah 6 Bulan</option>
+                <option value="12">Tambah 1 Tahun</option>
+            </select>
+            
+            <div class="flex gap-2">
+                <button @click="showRenewModal = false" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl active:scale-95">Batal</button>
+                <button @click="processRenew()" class="flex-1 bg-purple-600 text-white font-bold py-3 rounded-xl shadow-md active:scale-95">Perpanjang</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>
