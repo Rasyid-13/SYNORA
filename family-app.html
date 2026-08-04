@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SYNORA - Family Hub</title>
+  
+  <!-- PWA Manifest & Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="apple-touch-icon" href="logo.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 font-sans antialiased overflow-hidden" x-data="familyApp()">
+
+  <!-- 1. LOADING SCREEN -->
+  <div x-show="appState === 'loading'" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+    <div class="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] mb-6 flex items-center justify-center overflow-hidden animate-pulse border border-gray-50">
+      <img src="logo.png" onerror="this.style.display='none'" class="w-full h-full object-cover" alt="SYNORA Logo">
+    </div>
+    <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    <p class="mt-4 font-medium text-gray-500">Memuat Ruang Keluarga...</p>
+  </div>
+
+  <!-- 2. MAIN APP -->
+  <div x-show="appState === 'main'" x-cloak class="flex flex-col h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
+    
+    <!-- HEADER APP -->
+    <header class="bg-white px-5 py-4 flex justify-between items-center shadow-sm z-30 shrink-0 relative">
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm" x-text="activeOrg.name ? activeOrg.name.charAt(0).toUpperCase() : 'F'"></div>
+        <div>
+          <h1 class="font-bold text-lg text-gray-800 leading-tight" x-text="activeOrg.name">Family Name</h1>
+          <p class="text-[10px] text-gray-400 font-mono uppercase" x-text="activeOrg.id">ORG-ID</p>
+        </div>
+      </div>
+      
+      <div class="relative">
+        <button @click="showMenu = !showMenu" class="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition active:scale-95">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+        </button>
+        <div x-show="showMenu" @click.away="showMenu = false" x-transition class="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden">
+          
+          <!-- Menu khusus saat di Tab Chat (Termasuk Ganti Organisasi & Merge) -->
+          <template x-if="activeTab === 'chat'">
+            <div>
+              <button @click="window.location.href='index.html'" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition border-b border-gray-50"><span>🔄</span> Ganti Organisasi</button>
+              <button x-show="permissions.merge_family" @click="showMergeModal = true; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-purple-600 font-bold hover:bg-purple-50 flex items-center gap-2 transition"><span>🔗</span> Merge Family (Extended)</button>
+            </div>
+          </template>
+          
+          <template x-if="activeTab === 'organization'">
+            <div>
+              <button @click="memberSort = 'role'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition"><span>Sort by Role</span> <span x-show="memberSort === 'role'" class="text-blue-600 font-bold">✓</span></button>
+              <button @click="memberSort = 'alphabet'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-t border-gray-50"><span>Sort by Alphabet</span> <span x-show="memberSort === 'alphabet'" class="text-blue-600 font-bold">✓</span></button>
+              <button @click="memberSort = 'date'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-t border-gray-50"><span>Sort by Newest</span> <span x-show="memberSort === 'date'" class="text-blue-600 font-bold">✓</span></button>
+            </div>
+          </template>
+          
+          <template x-if="activeTab === 'finance'">
+            <div>
+              <button @click="financeFilter = 'daily'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition"><span>View Daily</span> <span x-show="financeFilter === 'daily'" class="text-blue-600 font-bold">✓</span></button>
+              <button @click="financeFilter = 'weekly'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-t border-gray-50"><span>View Weekly</span> <span x-show="financeFilter === 'weekly'" class="text-blue-600 font-bold">✓</span></button>
+              <button @click="financeFilter = 'monthly'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-t border-gray-50"><span>View Monthly</span> <span x-show="financeFilter === 'monthly'" class="text-blue-600 font-bold">✓</span></button>
+            </div>
+          </template>
+          
+          <template x-if="activeTab === 'manage'">
+            <div>
+              <button @click="openProfileModal(); showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition"><span>✏️</span> Edit Profile</button>
+            </div>
+          </template>
+
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 relative z-10 overflow-hidden" id="main-content">
+      
+      <!-- CHAT (Ruang Tamu) -->
+      <section x-show="activeTab === 'chat'" class="absolute inset-0 flex flex-col p-4 pb-24">
+        <div class="bg-white p-4 rounded-2xl shadow-sm mb-2 shrink-0 border border-gray-100">
+          <h2 class="font-bold text-gray-700" x-text="activeOrg.name + ' Chat'">Family Chat</h2>
+          <p class="text-xs text-gray-500">Secure end-to-end organizational hub.</p>
+        </div>
+        <div class="flex-1 overflow-y-auto space-y-3 pb-2" id="chat-container">
+          <template x-for="msg in messages" :key="msg.id">
+            <div :class="msg.sender_id === userUid ? 'flex justify-end' : 'flex justify-start'">
+              <div :class="msg.sender_id === userUid ? 'bg-blue-600 text-white rounded-l-2xl rounded-tr-2xl' : 'bg-white border border-gray-100 text-gray-800 rounded-r-2xl rounded-tl-2xl shadow-sm'" class="max-w-[80%] p-3">
+                <p x-show="msg.sender_id !== userUid" class="text-[10px] font-bold text-gray-400 mb-1" x-text="getMemberName(msg.sender_id)"></p>
+                <p class="text-sm leading-relaxed" x-text="msg.text"></p>
+                <p class="text-[10px] text-right mt-1" :class="msg.sender_id === userUid ? 'text-blue-200' : 'text-gray-400'" x-text="formatTime(msg.timestamp)"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="bg-white border border-gray-100 p-2 flex gap-2 items-center shrink-0 rounded-2xl shadow-sm mt-2">
+          <input x-model="newMessage" @keyup.enter="sendMessage()" type="text" placeholder="Type a message..." class="flex-1 bg-gray-50 rounded-xl px-4 py-3 outline-none focus:bg-gray-100 transition text-sm">
+          <button @click="sendMessage()" class="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-md active:scale-95 transition shrink-0">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- FINANCE (Buku Kas Keluarga) -->
+      <section x-show="activeTab === 'finance'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-800 p-5 rounded-3xl shadow-md text-white mb-4 shrink-0 relative overflow-hidden">
+          <div class="absolute -right-4 -top-4 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+          <div class="flex justify-between items-start relative z-10">
+             <div>
+               <p class="text-xs opacity-80 mb-1">Total Kas Keluarga</p>
+               <h2 class="text-3xl font-bold tracking-tight" x-text="formatCurrency(totalCash)">Rp 0</h2>
+             </div>
+             <button x-show="financeSubTab === 'cashflow' ? permissions.edit_finance : permissions.manage_budget" @click="showFinanceModal = true" class="bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-2xl w-12 h-12 flex items-center justify-center text-2xl font-light backdrop-blur-md transition active:scale-95 shadow-sm">+</button>
+          </div>
+          <div class="flex gap-3 mt-5 pt-4 border-t border-white/20 relative z-10">
+             <div class="flex-1">
+               <p class="text-[10px] opacity-70 mb-1">Pemasukan (<span class="capitalize" x-text="financeFilter"></span>)</p>
+               <p class="font-bold text-sm text-green-300 truncate" x-text="'+' + formatCurrency(currentIncome)">+Rp 0</p>
+             </div>
+             <div class="flex-1 border-l border-white/20 pl-3">
+               <p class="text-[10px] opacity-70 mb-1">Pengeluaran (<span class="capitalize" x-text="financeFilter"></span>)</p>
+               <p class="font-bold text-sm text-red-300 truncate" x-text="'-' + formatCurrency(currentExpense)">-Rp 0</p>
+             </div>
+          </div>
+        </div>
+        
+        <div class="flex gap-2 bg-gray-200/60 p-1.5 rounded-2xl mb-3 shrink-0">
+          <button @click="financeSubTab = 'cashflow'" :class="financeSubTab === 'cashflow' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-2 rounded-xl text-xs font-bold transition">Cash Flow</button>
+          <button @click="financeSubTab = 'budget'" :class="financeSubTab === 'budget' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-2 rounded-xl text-xs font-bold transition">Budgeting</button>
+          <button @click="financeSubTab = 'debt'" :class="financeSubTab === 'debt' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="flex-1 py-2 rounded-xl text-xs font-bold transition">Hutang/Cicilan</button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto pb-4 space-y-3">
+           <div x-show="financeSubTab === 'cashflow'" class="space-y-3">
+             <template x-for="tx in filteredTransactions" :key="tx.id">
+               <div class="bg-white p-4 rounded-2xl shadow-sm flex justify-between items-center border border-gray-50">
+                 <div class="flex items-center gap-3">
+                   <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg" :class="tx.type === 'income' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'" x-text="tx.type === 'income' ? '↑' : '↓'"></div>
+                   <div><p class="font-bold text-sm text-gray-800" x-text="tx.desc"></p><p class="text-[10px] text-gray-400" x-text="formatDate(tx.timestamp)"></p></div>
+                 </div>
+                 <p class="font-bold text-sm" :class="tx.type === 'income' ? 'text-green-600' : 'text-red-600'" x-text="(tx.type === 'income' ? '+' : '') + formatCurrency(tx.amount)"></p>
+               </div>
+             </template>
+           </div>
+           
+           <div x-show="financeSubTab === 'budget'" x-cloak class="space-y-3">
+             <template x-for="item in budgets" :key="item.id">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
+                  <div class="flex justify-between items-start mb-2"><p class="font-bold text-sm text-gray-800" x-text="item.name"></p><p class="font-bold text-blue-600 text-sm" x-text="formatCurrency(item.amount)"></p></div>
+                  <div class="flex items-center gap-2 mt-2 bg-gray-50 rounded-lg p-2"><span class="text-sm">⏱️</span><p class="text-xs font-bold" :class="getTimerColor(item.dueDate)" x-text="getTimerText(item.dueDate)"></p></div>
+                </div>
+             </template>
+           </div>
+           
+           <div x-show="financeSubTab === 'debt'" x-cloak class="space-y-3">
+             <template x-for="item in debts" :key="item.id">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-red-50">
+                  <div class="flex justify-between items-start mb-2"><p class="font-bold text-sm text-gray-800" x-text="item.name"></p><p class="font-bold text-red-600 text-sm" x-text="formatCurrency(item.amount)"></p></div>
+                  <div class="flex items-center gap-2 mt-2 bg-red-50 rounded-lg p-2"><span class="text-sm">⚠️</span><p class="text-xs font-bold" :class="getTimerColor(item.dueDate)" x-text="getTimerText(item.dueDate)"></p></div>
+                </div>
+             </template>
+           </div>
+        </div>
+      </section>
+
+      <!-- ORG (Daftar Anggota Keluarga) -->
+      <section x-show="activeTab === 'organization'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24">
+        <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-5 rounded-3xl shadow-md text-white mb-4 shrink-0 relative overflow-hidden">
+          <div class="absolute -right-4 -top-4 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+          <div class="flex justify-between items-start relative z-10">
+             <div>
+               <p class="text-xs opacity-80 mb-1">Family Hub</p>
+               <h2 class="text-2xl font-bold tracking-tight" x-text="activeOrg.name">Family Name</h2>
+             </div>
+             <button @click="copyOrgId()" class="bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl px-3 py-2 flex items-center gap-2 text-xs font-mono backdrop-blur-md transition shadow-sm"><span x-text="activeOrg.id"></span> 📄</button>
+          </div>
+          <div class="mt-4 pt-3 border-t border-white/20 relative z-10 flex gap-4">
+             <div>
+               <p class="text-[10px] opacity-70">Total Anggota</p>
+               <p class="font-bold text-sm" x-text="members.length + ' Orang'"></p>
+             </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-3 px-1 shrink-0">
+          <h3 class="font-bold text-gray-700">Daftar Anggota</h3>
+          <button x-show="permissions.manage_members" @click="openMemberModal('add')" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95 transition shadow-sm">+ Undang</button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto space-y-2 pb-4">
+          <template x-for="member in sortedMembers" :key="member.uid">
+            <div class="bg-white p-3 rounded-2xl shadow-sm flex items-center gap-3 border border-gray-50 transition hover:border-indigo-100">
+              <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-lg" x-text="(member.name || member.role_name || 'M').charAt(0).toUpperCase()"></div>
+              <div class="flex-1">
+                <p class="font-bold text-sm text-gray-800 flex items-center gap-2">
+                  <span x-text="member.uid === userUid ? (member.name || userName || 'You') + ' (You)' : (member.name || member.short_id || 'Member')"></span>
+                  <span x-show="member.role_name === 'Head'" class="bg-yellow-100 text-yellow-700 text-[9px] px-1.5 py-0.5 rounded font-bold">KEPALA</span>
+                  <span x-show="member.role_name === 'Extended Family'" class="bg-purple-100 text-purple-700 text-[9px] px-1.5 py-0.5 rounded font-bold">EXTENDED</span>
+                </p>
+                <p class="text-xs text-gray-400" x-text="member.role_name"></p>
+              </div>
+              <button x-show="permissions.manage_members && member.uid !== userUid" @click="openMemberModal('edit', member)" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg active:scale-95 transition">⚙️</button>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- MANAGE (Pengaturan) -->
+      <section x-show="activeTab === 'manage'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24 overflow-y-auto">
+        <div class="flex items-center gap-4 bg-white p-5 rounded-3xl shadow-sm mb-6 border border-gray-100">
+          <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-2xl border-2 border-blue-200">
+             <span x-text="userName ? userName.charAt(0).toUpperCase() : 'U'"></span>
+          </div>
+          <div>
+            <h2 class="font-bold text-xl" x-text="userName || 'User Profile'"></h2>
+            <p class="text-sm text-gray-500 font-mono mt-1" x-text="userContact">Contact</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100 mb-6">
+          <button @click="openPermissionsModal()" class="w-full flex items-center justify-between p-4 border-b border-gray-50 active:bg-gray-50 text-left transition">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🔐</span>
+              <span class="font-medium text-gray-700" x-text="permissions.edit_permissions ? 'Kelola Otoritas' : 'Otoritas Saya'"></span>
+            </div>
+            <span class="text-gray-400">➔</span>
+          </button>
+          <button @click="openNotebook()" class="w-full flex items-center justify-between p-4 border-b border-gray-50 active:bg-gray-50 text-left transition">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">📓</span>
+              <span class="font-medium text-gray-700">Buku Catatan Keluarga</span>
+            </div>
+            <span class="text-gray-400">➔</span>
+          </button>
+          <button @click="requestNotificationPermission()" class="w-full flex items-center justify-between p-4 active:bg-gray-50 text-left transition">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🔔</span>
+              <span class="font-medium text-gray-700">Aktifkan Notifikasi</span>
+            </div>
+            <span class="text-gray-400">➔</span>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= MODALS ================= -->
+    
+    <!-- Modal Merge -->
+    <div x-show="showMergeModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div @click.away="showMergeModal = false" x-show="showMergeModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-xl">Merge Keluarga</h3>
+          <button @click="showMergeModal = false" class="text-gray-400 bg-gray-50 p-2 rounded-full font-bold leading-none">&times;</button>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Serap anggota dari keluarga lain ke dalam keluarga ini sebagai "Extended Family".</p>
+        <div class="mb-6">
+          <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">ID Organisasi Target</label>
+          <input x-model="mergeTargetId" type="text" placeholder="ORG-XXXXX" class="w-full px-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white font-mono uppercase outline-none transition">
+        </div>
+        <button @click="mergeFamily()" class="w-full bg-purple-600 text-white font-bold py-4 rounded-xl active:scale-95 transition shadow-md">Jalankan Merge</button>
+      </div>
+    </div>
+
+    <!-- Modal Profil -->
+    <div x-show="showProfileModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div @click.away="showProfileModal = false" x-show="showProfileModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-xl">Edit Profil</h3>
+          <button @click="showProfileModal = false" class="text-gray-400 bg-gray-50 p-2 rounded-full font-bold leading-none">&times;</button>
+        </div>
+        <div class="space-y-4 mb-6">
+          <div>
+            <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Nama Lengkap</label>
+            <input x-model="profileForm.name" type="text" class="w-full px-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white font-bold outline-none transition">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Status (Peran di Keluarga)</label>
+            <input x-model="profileForm.role" type="text" class="w-full px-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white font-bold outline-none transition">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Email (Akses Login)</label>
+            <input x-model="profileForm.email" type="email" class="w-full px-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none transition">
+          </div>
+        </div>
+        <button @click="saveProfile()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl active:scale-95 transition shadow-md">Simpan Profil</button>
+      </div>
+    </div>
+
+    <!-- Modal Finance -->
+    <div x-show="showFinanceModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div @click.away="showFinanceModal = false" x-show="showFinanceModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-xl" x-text="financeSubTab === 'cashflow' ? 'Catat Transaksi' : (financeSubTab === 'budget' ? 'Buat Anggaran' : 'Catat Hutang')"></h3>
+          <button @click="showFinanceModal = false" class="text-gray-400 bg-gray-50 p-2 rounded-full font-bold leading-none">&times;</button>
+        </div>
+        <template x-if="financeSubTab === 'cashflow'">
+          <div>
+            <div class="flex gap-2 mb-5 bg-gray-50 p-1 rounded-2xl">
+              <button @click="newTx.type = 'expense'" class="flex-1 py-3 rounded-xl font-bold text-sm transition" :class="newTx.type === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'">Pengeluaran (-)</button>
+              <button @click="newTx.type = 'income'" class="flex-1 py-3 rounded-xl font-bold text-sm transition" :class="newTx.type === 'income' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'">Pemasukan (+)</button>
+            </div>
+            <input x-model="newTx.amount" type="number" placeholder="Nominal Rp" class="w-full px-4 py-4 rounded-xl border border-gray-200 mb-3 bg-gray-50 focus:bg-white outline-none font-bold">
+            <input x-model="newTx.desc" type="text" placeholder="Keterangan..." class="w-full px-4 py-4 rounded-xl border border-gray-200 mb-6 bg-gray-50 focus:bg-white outline-none">
+          </div>
+        </template>
+        <template x-if="financeSubTab === 'budget' || financeSubTab === 'debt'">
+          <div>
+            <input x-model="newItem.name" type="text" placeholder="Nama Keperluan / Hutang" class="w-full px-4 py-4 rounded-xl border mb-3 bg-gray-50 focus:bg-white font-bold outline-none">
+            <input x-model="newItem.amount" type="number" placeholder="Target Nominal Rp" class="w-full px-4 py-4 rounded-xl border mb-3 bg-gray-50 focus:bg-white font-bold outline-none">
+            <div class="mb-6">
+              <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Tenggat Waktu / Jatuh Tempo</label>
+              <input x-model="newItem.dueDate" type="date" class="w-full px-4 py-4 rounded-xl border bg-gray-50 focus:bg-white outline-none">
+            </div>
+          </div>
+        </template>
+        <button @click="saveFinanceData()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl active:scale-95 transition shadow-md">Simpan Data</button>
+      </div>
+    </div>
+
+    <!-- Modal Member Permissions -->
+    <div x-show="showPermissionsModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div @click.away="showPermissionsModal = false" x-show="showPermissionsModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-xl" x-text="permissions.edit_permissions ? 'Kelola Hak Akses' : 'Hak Akses Saya'"></h3>
+          <button @click="showPermissionsModal = false" class="text-gray-400 bg-gray-50 p-2 rounded-full font-bold leading-none">&times;</button>
+        </div>
+        <template x-if="permissions.edit_permissions">
+           <div class="space-y-4">
+              <p class="text-xs text-gray-500 font-bold">Pilih Anggota:</p>
+              <select x-model="selectedMemberForPerms" @change="loadMemberPerms()" class="w-full px-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white font-bold outline-none transition">
+                  <option value="">-- Pilih --</option>
+                  <template x-for="m in members" :key="m.uid">
+                      <option :value="m.uid" x-text="(m.name || 'User') + ' - ' + m.role_name"></option>
+                  </template>
+              </select>
+              <div x-show="selectedMemberForPerms" class="space-y-3 mt-4">
+                  <p class="text-xs text-gray-500 font-bold mb-2">Konfigurasi Hak:</p>
+                  <template x-for="(value, key) in editingPerms" :key="key">
+                      <div class="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+                          <span class="text-sm font-medium text-gray-700 capitalize" x-text="key.replace('_', ' ')"></span>
+                          <button @click="editingPerms[key] = !editingPerms[key]" :class="editingPerms[key] ? 'bg-blue-600' : 'bg-gray-200'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shadow-inner">
+                              <span :class="editingPerms[key] ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm"></span>
+                          </button>
+                      </div>
+                  </template>
+                  <button @click="saveMemberPerms()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl mt-4 active:scale-95 shadow-md transition">Simpan Akses</button>
+              </div>
+           </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Modal Member Add/Edit -->
+    <div x-show="showMemberModal" x-cloak class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
+      <div @click.away="showMemberModal = false" x-show="showMemberModal" x-transition.duration.300ms class="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl p-6 pb-12 transform transition-all shadow-2xl border border-gray-100 max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-bold text-xl" x-text="memberModalMode === 'add' ? 'Undang Anggota' : 'Edit Peran'"></h3>
+          <button @click="showMemberModal = false" class="text-gray-400 bg-gray-50 p-2 rounded-full font-bold">&times;</button>
+        </div>
+        <div x-show="memberModalMode === 'add'" class="mb-4">
+          <p class="text-xs text-gray-500 mb-4">Untuk keamanan, keluarga saling mengundang mandiri via halaman depan menggunakan kode <b class="text-gray-800" x-text="activeOrg.id"></b>. Fitur ini hanya untuk mengganti peran anggota yang sudah masuk.</p>
+        </div>
+        <div x-show="memberModalMode === 'edit'" class="mb-6">
+          <label class="text-xs text-gray-500 font-bold ml-1 mb-1 block">Ubah Peran</label>
+          <input x-model="memberForm.role" type="text" placeholder="e.g. Anak, Istri, Kakek" class="w-full px-4 py-4 rounded-xl border outline-none bg-gray-50 focus:bg-white font-bold">
+        </div>
+        <button x-show="memberModalMode === 'edit'" @click="saveMember()" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl active:scale-95 transition shadow-md mb-3">Simpan Peran</button>
+        <button x-show="memberModalMode === 'edit'" @click="removeMember()" class="w-full bg-red-50 text-red-600 font-bold py-4 rounded-xl active:scale-95">Keluarkan dari Keluarga</button>
+      </div>
+    </div>
+
+    <!-- Modal Notebook -->
+    <div x-show="showNotebookModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0">
+        <div class="flex items-center gap-3">
+          <button @click="showNotebookModal = false" class="text-gray-500 hover:text-gray-800 font-bold text-xl">&larr; Tutup</button>
+        </div>
+        <button x-show="notebookMode === 'list' && permissions.edit_notebook" @click="notebookMode = 'edit'; noteForm = {id: null, title: '', content: ''}" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition active:scale-95">+ Catatan Baru</button>
+      </header>
+      <div x-show="notebookMode === 'list'" class="flex-1 overflow-y-auto p-4 space-y-3">
+         <template x-for="note in notes" :key="note.id">
+           <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative">
+             <h3 class="font-bold text-gray-800 text-lg mb-2 pr-12" x-text="note.title"></h3>
+             <button x-show="permissions.edit_notebook" @click="notebookMode = 'edit'; noteForm = {id: note.id, title: note.title, content: note.content}" class="absolute top-4 right-4 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg font-bold transition active:scale-95">Edit</button>
+             <p class="text-sm text-gray-600 whitespace-pre-wrap line-clamp-3" x-text="note.content"></p>
+             <p class="text-[10px] text-gray-400 mt-4 font-mono" x-text="'Diperbarui: ' + formatDate(note.updated_at)"></p>
+           </div>
+         </template>
+         <div x-show="notes.length === 0" class="text-center text-gray-400 py-10 text-sm">Belum ada catatan keluarga.</div>
+      </div>
+      <div x-show="notebookMode === 'edit'" class="flex-1 flex flex-col p-4">
+         <input x-model="noteForm.title" type="text" placeholder="Judul Catatan..." class="w-full px-4 py-4 rounded-xl border border-gray-200 outline-none text-xl font-bold mb-3 shadow-sm focus:border-blue-600 transition">
+         <textarea x-model="noteForm.content" placeholder="Tulis catatan, resep, atau aturan rumah di sini..." class="w-full flex-1 p-4 rounded-xl border border-gray-200 outline-none resize-none shadow-sm text-gray-700 focus:border-blue-600 transition"></textarea>
+         <div class="flex gap-2 mt-4 shrink-0">
+           <button @click="notebookMode = 'list'" class="w-1/3 bg-gray-200 text-gray-700 font-bold py-4 rounded-xl active:scale-95 transition">Batal</button>
+           <button @click="saveNote()" class="w-2/3 bg-blue-600 text-white font-bold py-4 rounded-xl active:scale-95 shadow-md transition">Simpan</button>
+         </div>
+         <button x-show="noteForm.id" @click="deleteNote(noteForm.id)" class="w-full mt-3 text-red-500 font-bold py-3 transition active:scale-95">Hapus Catatan</button>
+      </div>
+    </div>
+
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="fixed bottom-0 w-full h-20 bg-white border-t border-gray-100 flex justify-around items-center px-2 pb-2 z-50 shrink-0">
+      <button @click="switchTab('chat')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'chat' ? 'text-blue-600' : 'text-gray-400'">
+        <div :class="activeTab === 'chat' ? 'bg-blue-100 px-4 py-1 rounded-2xl' : 'px-4 py-1'">💬</div>
+        <span class="text-[10px] mt-1 font-medium">Obrolan</span>
+      </button>
+      <button @click="switchTab('finance')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'finance' ? 'text-blue-600' : 'text-gray-400'">
+        <div :class="activeTab === 'finance' ? 'bg-blue-100 px-4 py-1 rounded-2xl' : 'px-4 py-1'">📊</div>
+        <span class="text-[10px] mt-1 font-medium">Uang</span>
+      </button>
+      <button @click="switchTab('organization')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'organization' ? 'text-blue-600' : 'text-gray-400'">
+        <div :class="activeTab === 'organization' ? 'bg-blue-100 px-4 py-1 rounded-2xl' : 'px-4 py-1'">🏡</div>
+        <span class="text-[10px] mt-1 font-medium">Keluarga</span>
+      </button>
+      <button @click="switchTab('manage')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'manage' ? 'text-blue-600' : 'text-gray-400'">
+        <div :class="activeTab === 'manage' ? 'bg-blue-100 px-4 py-1 rounded-2xl' : 'px-4 py-1'">⚙️</div>
+        <span class="text-[10px] mt-1 font-medium">Setelan</span>
+      </button>
+    </nav>
+    
+  </div>
+
+  <script type="module" src="js/family-app.js"></script>
+</body>
+</html>
