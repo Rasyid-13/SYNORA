@@ -46,6 +46,7 @@ Alpine.data('synoraGate', () => ({
 
     init() {
         console.log('SYNORA Gate V2 Initialized');
+        localStorage.clear();
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 this.userUid = user.uid;
