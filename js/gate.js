@@ -377,11 +377,12 @@ Alpine.data('synoraGate', () => ({
             }
         }
 
-        const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
+                const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
                           `*Detail Pesanan:*%0A` +
                           `- Paket: ${this.selectedTier.name}%0A` +
                           `- Nama Org: ${this.newOrgName}%0A` +
                           promoText +
+                          `- UID: ${this.userUid}%0A` +  // <--- INI BARIS TAMBAHANNYA
                           `- Req ID: ${reqId}%0A` +
                           `- Total Bayar: *Rp ${this.checkoutTotal.toLocaleString('id-ID')}*%0A%0A` +
                           `Berikut bukti transfer saya:`;
