@@ -38,7 +38,7 @@ Alpine.data('synoraGate', () => ({
 
     tiers: [
         { id: 'family', type: 'Family', name: 'Family Hub', tagline: 'Fondasi digital untuk keluarga Anda.', price: 0, period: 'Free forever', icon: '🏡', placeholder: 'Keluarga Cemara' },
-        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline: 'Manajemen proker dan himpunan.', price: 99000, period: 'per 6 months', icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
+        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline: 'Manajemen proker dan himpunan.', price: 180000, period: 'per 6 months', icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
         { id: 'esports', type: 'Esports', name: 'E-Sports Team', tagline: 'Manajemen drafting & kompetitif.', price: 149000, period: 'per month', icon: '🎮', placeholder: 'Rex Regum Qeon' },
         { id: 'traders', type: 'Traders', name: 'Traders Hub', tagline: 'Jurnal trading & manajemen margin.', price: 199000, period: 'per month', icon: '📈', placeholder: 'Alpha Syndicate' },
         { id: 'business', type: 'Business', name: 'Business & SME', tagline: 'Sistem pencatatan audit korporat.', price: 299000, period: 'per month', icon: '🏢', placeholder: 'PT Maju Bersama' }
