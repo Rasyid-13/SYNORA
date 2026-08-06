@@ -1,7 +1,7 @@
 import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, writeBatch, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 Alpine.data('familyApp', () => ({
     appState: 'loading',
@@ -74,7 +74,6 @@ Alpine.data('familyApp', () => ({
 
     async loadAppData() {
         try {
-            // 1. Ambil Profil User
             const userSnap = await getDoc(doc(db, "users", this.userUid));
             if (userSnap.exists()) {
                 const uData = userSnap.data();
@@ -83,7 +82,6 @@ Alpine.data('familyApp', () => ({
                 this.profileForm.email = uData.email || this.userContact;
             }
 
-            // 2. Ambil Data Organisasi
             const orgSnap = await getDoc(doc(db, "organizations", this.activeOrgId));
             if (!orgSnap.exists()) {
                 alert("Organisasi sudah tidak ada atau telah dibubarkan.");
@@ -93,7 +91,6 @@ Alpine.data('familyApp', () => ({
             const orgData = orgSnap.data();
             this.activeOrg = { id: orgData.org_id || orgSnap.id, ...orgData };
 
-            // 3. Ambil Peran & Hak Akses User
             const memberSnap = await getDoc(doc(db, "organizations", this.activeOrgId, "members", this.userUid));
             if (memberSnap.exists()) {
                 const mData = memberSnap.data();
@@ -107,7 +104,6 @@ Alpine.data('familyApp', () => ({
                 return;
             }
 
-            // 4. Pasang Real-time Listeners
             this.listenToMessages();
             this.listenToMembers();
             this.listenToFinance();
@@ -120,7 +116,6 @@ Alpine.data('familyApp', () => ({
 
             this.appState = 'main';
         } catch (e) {
-            console.error(e);
             alert("Gagal memuat data: " + e.message);
         }
     },
@@ -131,7 +126,6 @@ Alpine.data('familyApp', () => ({
         localStorage.setItem('synora_active_tab_' + this.activeOrgId, tab);
     },
 
-    // --- CHAT SYSTEM ---
     listenToMessages() {
         const q = query(collection(db, "organizations", this.activeOrgId, "messages"), orderBy("timestamp", "asc"));
         onSnapshot(q, (snapshot) => {
@@ -161,7 +155,6 @@ Alpine.data('familyApp', () => ({
         return m ? (m.name || m.role_name || "Anggota") : "Anggota";
     },
 
-    // --- FINANCE SYSTEM ---
     listenToFinance() {
         onSnapshot(query(collection(db, "organizations", this.activeOrgId, "transactions"), orderBy("timestamp", "desc")), (snap) => {
             this.transactions = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -193,15 +186,9 @@ Alpine.data('familyApp', () => ({
         });
     },
     
-    get totalCash() {
-        return this.transactions.reduce((acc, tx) => tx.type === 'income' ? acc + Number(tx.amount) : acc - Number(tx.amount), 0);
-    },
-    get currentIncome() {
-        return this.filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
-    },
-    get currentExpense() {
-        return this.filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
-    },
+    get totalCash() { return this.transactions.reduce((acc, tx) => tx.type === 'income' ? acc + Number(tx.amount) : acc - Number(tx.amount), 0); },
+    get currentIncome() { return this.filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0); },
+    get currentExpense() { return this.filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0); },
 
     async saveFinanceData() {
         if (this.financeSubTab === 'cashflow') {
@@ -229,7 +216,6 @@ Alpine.data('familyApp', () => ({
         this.showFinanceModal = false;
     },
 
-    // --- MEMBERS SYSTEM ---
     listenToMembers() {
         onSnapshot(collection(db, "organizations", this.activeOrgId, "members"), (snap) => {
             this.members = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -265,36 +251,27 @@ Alpine.data('familyApp', () => ({
         this.showMemberModal = false;
     },
 
-    // --- NOTEBOOK SYSTEM ---
     listenToNotebook() {
         onSnapshot(collection(db, "organizations", this.activeOrgId, "notebook"), (snap) => {
             this.notes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         });
     },
     openNotebook() {
-        if (!this.permissions.view_notebook) {
-            return alert("Akses Ditolak 🔒: Admin membatasi Anda untuk melihat Buku Catatan.");
-        }
+        if (!this.permissions.view_notebook) return alert("Akses Ditolak 🔒: Admin membatasi Anda untuk melihat Buku Catatan.");
         this.notebookMode = 'list';
         this.showNotebookModal = true;
     },
     async saveNote() {
-        if (!this.permissions.edit_notebook) {
-            return alert("Akses Ditolak: Anda tidak memiliki izin untuk menambah atau mengubah catatan.");
-        }
+        if (!this.permissions.edit_notebook) return alert("Akses Ditolak: Anda tidak memiliki izin untuk mengubah catatan.");
         if (!this.noteForm.title.trim()) return alert("Judul catatan wajib diisi!");
         
         if (this.noteForm.id) {
             await updateDoc(doc(db, "organizations", this.activeOrgId, "notebook", this.noteForm.id), {
-                title: this.noteForm.title,
-                content: this.noteForm.content,
-                updated_at: serverTimestamp()
+                title: this.noteForm.title, content: this.noteForm.content, updated_at: serverTimestamp()
             });
         } else {
             await addDoc(collection(db, "organizations", this.activeOrgId, "notebook"), {
-                title: this.noteForm.title,
-                content: this.noteForm.content,
-                updated_at: serverTimestamp()
+                title: this.noteForm.title, content: this.noteForm.content, updated_at: serverTimestamp()
             });
         }
         this.notebookMode = 'list';
@@ -305,7 +282,6 @@ Alpine.data('familyApp', () => ({
         this.notebookMode = 'list';
     },
 
-    // --- PROFILE & PERMISSIONS ---
     openProfileModal() { 
         this.profileForm.phone = this.userContact;
         this.showProfileModal = true; 
@@ -313,13 +289,11 @@ Alpine.data('familyApp', () => ({
     async saveProfile() {
         try {
             await updateDoc(doc(db, "users", this.userUid), { 
-                name: this.profileForm.name,
-                contact: this.profileForm.phone 
+                name: this.profileForm.name, contact: this.profileForm.phone 
             });
 
             await updateDoc(doc(db, "organizations", this.activeOrgId, "members", this.userUid), { 
-                name: this.profileForm.name,
-                role_name: this.profileForm.role 
+                name: this.profileForm.name, role_name: this.profileForm.role 
             });
 
             if (this.profileForm.newPassword && auth.currentUser && auth.currentUser.email) {
@@ -336,9 +310,7 @@ Alpine.data('familyApp', () => ({
             alert("Gagal menyimpan profil: " + e.message);
         }
     },
-    openPermissionsModal() {
-        this.showPermissionsModal = true;
-    },
+    openPermissionsModal() { this.showPermissionsModal = true; },
     loadMemberPerms() {
         const m = this.members.find(x => x.uid === this.selectedMemberForPerms);
         if (m && m.permissions) {
@@ -349,24 +321,53 @@ Alpine.data('familyApp', () => ({
     },
     async saveMemberPerms() {
         if (!this.selectedMemberForPerms) return;
-        await updateDoc(doc(db, "organizations", this.activeOrgId, "members", this.selectedMemberForPerms), {
-            permissions: this.editingPerms
-        });
+        await updateDoc(doc(db, "organizations", this.activeOrgId, "members", this.selectedMemberForPerms), { permissions: this.editingPerms });
         this.showPermissionsModal = false;
         alert("Hak akses berhasil diperbarui!");
     },
 
-    // --- MERGE FAMILY ---
     async mergeFamily() {
-        if (!this.mergeTargetId.trim()) return alert("Masukkan ID target!");
-        alert("Fitur merge siap dikembangkan.");
-        this.showMergeModal = false;
+        const targetOrgId = this.mergeTargetId.trim().toUpperCase();
+        if(!targetOrgId || !targetOrgId.startsWith('ORG-')) return alert("Format ID salah!");
+        if(targetOrgId === this.activeOrgId) return alert("Tidak bisa merge dengan organisasi sendiri!");
+
+        try {
+            const snap = await getDoc(doc(db, "organizations", targetOrgId));
+            if(!snap.exists()) return alert("Organisasi target tidak ditemukan.");
+
+            const membersSnap = await getDocs(collection(db, "organizations", targetOrgId, "members"));
+            if(membersSnap.empty) return alert("Organisasi target kosong.");
+
+            const batch = writeBatch(db);
+            let addedCount = 0;
+
+            membersSnap.forEach(memberDoc => {
+                const memberData = memberDoc.data();
+                const targetUid = memberData.uid;
+
+                if(this.members.find(m => m.uid === targetUid)) return; 
+
+                batch.set(doc(db, "organizations", this.activeOrgId, "members", targetUid), {
+                    uid: targetUid, short_id: memberData.short_id || "USR", name: memberData.name || "Member",
+                    role_name: "Extended Family", joined_at: serverTimestamp(),
+                    permissions: { view_finance: true, edit_finance: false, edit_notebook: false, view_notebook: true, edit_permissions: false, manage_members: false }
+                });
+
+                batch.update(doc(db, "users", targetUid), { joined_organizations: arrayUnion(this.activeOrgId) });
+                addedCount++;
+            });
+
+            if (addedCount === 0) return alert("Semua anggota dari keluarga target sudah ada di organisasi ini.");
+            await batch.commit();
+            alert(`Berhasil Merge! ${addedCount} anggota telah ditambahkan.`);
+            this.showMergeModal = false;
+            this.mergeTargetId = '';
+        } catch (error) {
+            alert("Gagal melakukan merge: " + error.message);
+        }
     },
 
-    // --- UTILITIES ---
-    formatCurrency(val) {
-        return new Number(val || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
-    },
+    formatCurrency(val) { return new Number(val || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }); },
     formatTime(ts) {
         if (!ts) return '';
         const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -383,15 +384,27 @@ Alpine.data('familyApp', () => ({
         const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
         return days > 0 ? `${days} hari lagi` : 'Sudah lewat';
     },
-    getTimerColor(dateStr) {
-        return 'text-blue-600';
-    },
+    getTimerColor(dateStr) { return 'text-blue-600'; },
+
     copyOrgId() {
-        navigator.clipboard.writeText(this.activeOrgId);
-        alert("ID Organisasi disalin: " + this.activeOrgId);
+        const idToCopy = this.activeOrgId;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(idToCopy).then(() => { alert("ID Organisasi disalin: " + idToCopy); });
+        } else {
+            let textArea = document.createElement("textarea");
+            textArea.value = idToCopy;
+            textArea.style.position = "fixed"; textArea.style.left = "-999999px"; textArea.style.top = "-999999px";
+            document.body.appendChild(textArea); textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); alert("ID Organisasi disalin: " + idToCopy); } catch (err) { console.error("Gagal menyalin ID", err); }
+            textArea.remove();
+        }
     },
-    requestNotificationPermission() {
-        alert("Notifikasi diaktifkan!");
+    
+    async requestNotificationPermission() {
+        if (!('Notification' in window)) return alert("Browser Anda tidak mendukung Notifikasi.");
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') alert("Sistem Notifikasi berhasil diaktifkan di perangkat ini!");
+        else alert("Izin notifikasi ditolak oleh sistem HP/Browser.");
     }
 }));
 
