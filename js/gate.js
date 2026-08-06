@@ -5,9 +5,8 @@ import { auth, db } from './firebase-config.js';
 import { RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, arrayUnion, arrayRemove, increment } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-// KONFIGURASI SUPER ADMIN & WHATSAPP
-const SUPER_ADMIN_CONTACT = "+6283161523142"; // Nomor HP Super Admin (Pakai +62)
-const ADMIN_WA_NUMBER = "6283161523142"; // Nomor tujuan WA Admin (Tanpa +)
+const SUPER_ADMIN_CONTACT = "+6283161523142"; 
+const ADMIN_WA_NUMBER = "6283161523142"; 
 
 Alpine.data('synoraGate', () => ({
     appState: 'loading',
@@ -15,22 +14,18 @@ Alpine.data('synoraGate', () => ({
     userName: '',
     userContact: '',
     
-    // Auth State
     authMode: 'phone', phoneNumber: '', otpSent: false, otpCode: '', email: '', password: '', confirmationResult: null,
 
-    // Data Organisasi
     myOrganizations: [],
     isAdmin: false, 
     joinOrgId: '',
 
-    // Etalase & Checkout State
     showCheckout: false,
     selectedTier: null,
     newOrgName: '',
     uniqueCode: 0,
     checkoutTotal: 0,
     
-    // Promo State
     promoInput: '',
     promoMessage: '',
     promoValid: false,
@@ -40,9 +35,7 @@ Alpine.data('synoraGate', () => ({
 
     tiers: [
         { id: 'family', type: 'Family', name: 'Family Hub', tagline: 'Fondasi digital untuk keluarga Anda.', price: 0, period: 'Free forever', icon: '🏡', placeholder: 'Keluarga Cemara' },
-        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline:
-        'Manajemen proker dan himpunan.', price: 180000, period: 'per 6 months',
-        icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
+        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline: 'Manajemen proker dan himpunan.', price: 180000, period: 'per 6 months', icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
         { id: 'esports', type: 'Esports', name: 'E-Sports Team', tagline: 'Manajemen drafting & kompetitif.', price: 149000, period: 'per month', icon: '🎮', placeholder: 'Rex Regum Qeon' },
         { id: 'traders', type: 'Traders', name: 'Traders Hub', tagline: 'Jurnal trading & manajemen margin.', price: 199000, period: 'per month', icon: '📈', placeholder: 'Alpha Syndicate' },
         { id: 'business', type: 'Business', name: 'Business & SME', tagline: 'Sistem pencatatan audit korporat.', price: 299000, period: 'per month', icon: '🏢', placeholder: 'PT Maju Bersama' }
@@ -50,6 +43,17 @@ Alpine.data('synoraGate', () => ({
 
     init() {
         console.log('SYNORA Gate V2 Initialized');
+        
+        // Pindahkan Pendengar Notifikasi ke dalam Init agar aman
+        try {
+            onMessage(messaging, (payload) => {
+                console.log('Notifikasi masuk saat app dibuka:', payload);
+                alert(`📢 ${payload.notification.title}\n${payload.notification.body}`);
+            });
+        } catch(e) {
+            console.log("Sistem Notifikasi belum siap dimuat");
+        }
+
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 this.userUid = user.uid;
@@ -62,7 +66,6 @@ Alpine.data('synoraGate', () => ({
         });
     },
 
-    // --- AUTHENTICATION ---
     setupRecaptcha() {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'normal' });
     },
@@ -89,12 +92,30 @@ Alpine.data('synoraGate', () => ({
         await signOut(auth); window.location.reload();
     },
 
-    // --- LOAD USER DATA ---
+    async aktifkanNotifikasi(uid) {
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const token = await getToken(messaging, { 
+                    vapidKey: 'BHT5eoQ7VXyq8nbgY60noV-wcYAn0WzOEbscj4lh69mbIL1fAHm2oYeRL76L5gdEmhdazeAqol7i76G94fu96jg' 
+                });
+                if (token) {
+                    await updateDoc(doc(db, "users", uid), { fcmToken: token });
+                }
+            }
+        } catch (error) {
+            console.error('Gagal mengaktifkan notifikasi:', error);
+        }
+    },
+
     async checkUser(uid, contact) {
         const userRef = doc(db, "users", uid);
         const userSnap = await getDoc(userRef);
 
         this.isAdmin = (contact === SUPER_ADMIN_CONTACT);
+        
+        // Aktifkan Notifikasi setelah berhasil login
+        this.aktifkanNotifikasi(uid);
 
         if (userSnap.exists()) {
             const data = userSnap.data();
@@ -107,14 +128,11 @@ Alpine.data('synoraGate', () => ({
             this.userName = "New User";
         }
         
-        // --- FITUR BARU: AUTO-REDIRECT KE ORG TERAKHIR ---
         const lastOrgStr = localStorage.getItem('synora_last_org');
         if (lastOrgStr) {
             try {
                 const lastOrg = JSON.parse(lastOrgStr);
-                // Pastikan dia masih member di org tersebut (belum dikick/bubar)
                 if (this.myOrganizations.some(o => o.id === lastOrg.id)) {
-                    // Langsung lempar ke dalam organisasi!
                     return this.enterOrganization(lastOrg.id, lastOrg.type); 
                 } else {
                     localStorage.removeItem('synora_last_org');
@@ -122,10 +140,9 @@ Alpine.data('synoraGate', () => ({
             } catch(e) {}
         }
         
-        this.appState = 'main'; // Tampilkan gateway HANYA jika tidak di-redirect
+        this.appState = 'main'; 
     },
 
-    // --- LOAD ORGANIZATIONS ---
     async loadOrganizations(orgIds) {
         this.myOrganizations = [];
         let validOrgIds = []; 
@@ -148,45 +165,7 @@ Alpine.data('synoraGate', () => ({
             await updateDoc(doc(db, "users", this.userUid), { joined_organizations: validOrgIds });
         }
     },
-async function aktifkanNotifikasi(userUid) {
-    try {
-        // Minta izin ke HP/Browser pengguna
-        const permission = await Notification.requestPermission();
-        
-        if (permission === 'granted') {
-            console.log('Izin Notifikasi Diberikan!');
-            
-            // Dapatkan Token Perangkat (Ganti 'VAPID_KEY_ANDA' dari Firebase Console)
-            // Cara dapet VAPID: Project Settings -> Cloud Messaging -> Web configuration -> Generate Key pair
-            const token = await getToken(messaging, { 
-                vapidKey:
-                'BHT5eoQ7VXyq8nbgY60noV-wcYAn0WzOEbscj4lh69mbIL1fAHm2oYeRL76L5gdEmhdazeAqol7i76G94fu96jg'
-                
-            });
-            
-            if (token) {
-                // Simpan token ini ke database user agar admin bisa ngirim notif ke dia
-                await updateDoc(doc(db, "users", userUid), {
-                    fcmToken: token
-                });
-                console.log("Token Notifikasi Tersimpan:", token);
-            }
-        } else {
-            console.log('Izin Notifikasi Ditolak.');
-        }
-    } catch (error) {
-        console.error('Gagal mengaktifkan notifikasi:', error);
-    }
-}
 
-// Menangkap notifikasi saat aplikasi sedang dibuka (Foreground)
-onMessage(messaging, (payload) => {
-    console.log('Notifikasi masuk saat app dibuka:', payload);
-    // Munculkan popup bawaan browser
-    alert(`📢 ${payload.notification.title}\n${payload.notification.body}`);
-});
-
-    // --- FITUR JOIN ORGANISASI ---
     async joinOrg() {
         if (!this.joinOrgId.trim()) return alert("Masukkan ID Organisasi!");
         const inputId = this.joinOrgId.trim().toUpperCase(); 
@@ -206,25 +185,13 @@ onMessage(messaging, (payload) => {
             }
 
             const batch = writeBatch(db);
-            
-            batch.update(doc(db, "users", this.userUid), {
-                joined_organizations: arrayUnion(inputId)
-            });
-
+            batch.update(doc(db, "users", this.userUid), { joined_organizations: arrayUnion(inputId) });
             batch.set(doc(db, "organizations", inputId, "members", this.userUid), {
-                uid: this.userUid,
-                name: this.userName,
-                role_name: "Member", 
-                joined_at: serverTimestamp(),
-                permissions: { 
-                    view_finance: true, edit_finance: false, manage_budget: false, 
-                    manage_members: false, edit_permissions: false, 
-                    view_notebook: true, edit_notebook: false 
-                }
+                uid: this.userUid, name: this.userName, role_name: "Member", joined_at: serverTimestamp(),
+                permissions: { view_finance: true, edit_finance: false, manage_budget: false, manage_members: false, edit_permissions: false, view_notebook: true, edit_notebook: false }
             });
 
             await batch.commit();
-            
             this.joinOrgId = ''; 
             await this.checkUser(this.userUid, this.userContact); 
             alert("Berhasil bergabung!");
@@ -234,10 +201,8 @@ onMessage(messaging, (payload) => {
         }
     },
 
-    // --- FITUR KELUAR ORGANISASI (ANGGOTA) ---
     async leaveOrg(orgId, orgName) {
         if (!confirm(`Apakah Anda yakin ingin KELUAR dari organisasi "${orgName}"?`)) return;
-
         this.appState = 'loading';
         try {
             const batch = writeBatch(db);
@@ -252,7 +217,6 @@ onMessage(messaging, (payload) => {
         }
     },
 
-    // --- FITUR BUBARKAN ORGANISASI (KETUA) ---
     async disbandOrg(orgId, orgName) {
         const text = prompt(`Peringatan Berbahaya!\nKetik "BUBAR" untuk menghapus "${orgName}" selamanya.`);
         if (text !== "BUBAR") {
@@ -272,23 +236,16 @@ onMessage(messaging, (payload) => {
         }
     },
 
-    // --- ROUTING (REDIRECT) ---
     async enterOrganization(orgId, type) {
         const orgSnap = await getDoc(doc(db, "organizations", orgId));
         if (orgSnap.exists()) {
             const orgData = orgSnap.data();
-            
-            if (orgData.status === 'locked') {
-                return alert("Organisasi ini ditangguhkan oleh sistem. Harap hubungi Admin.");
-            }
+            if (orgData.status === 'locked') return alert("Organisasi ini ditangguhkan oleh sistem. Harap hubungi Admin.");
             if (orgData.expires_at) {
                 const expDate = orgData.expires_at.toDate ? orgData.expires_at.toDate() : new Date(orgData.expires_at);
-                if (new Date() > expDate) {
-                    return alert("Masa aktif langganan organisasi ini telah habis. Harap hubungi Admin untuk perpanjangan.");
-                }
+                if (new Date() > expDate) return alert("Masa aktif langganan organisasi ini telah habis. Harap hubungi Admin.");
             }
         }
-        // ... (Kode pengecekan locked/expired biarkan saja) ...
 
         let targetFile = 'family-app.html';
         if (type === 'Family') targetFile = 'family-app.html';
@@ -297,17 +254,13 @@ onMessage(messaging, (payload) => {
         else if (type === 'Traders') targetFile = 'traders-app.html';
         else if (type === 'Business') targetFile = 'business-app.html';
 
-        // --- FITUR BARU: SIMPAN MEMORI TERAKHIR DIBUKA ---
         localStorage.setItem('synora_last_org', JSON.stringify({ id: orgId, type: type }));
-
         window.location.href = `${targetFile}?orgId=${orgId}`;
     },
 
-    // --- ETALASE & CHECKOUT ---
     selectTier(tier) {
         this.selectedTier = tier;
         this.newOrgName = '';
-        
         this.promoInput = '';
         this.promoMessage = '';
         this.promoValid = false;
@@ -340,33 +293,24 @@ onMessage(messaging, (payload) => {
         
         try {
             const promoSnap = await getDoc(doc(db, "promo_codes", code));
-            
             if (!promoSnap.exists()) {
-                this.promoValid = false;
-                this.promoMessage = "❌ Kode promo tidak ditemukan.";
-                return;
+                this.promoValid = false; this.promoMessage = "❌ Kode promo tidak ditemukan."; return;
             }
             
             const promo = promoSnap.data();
-            
             if (promo.used >= promo.maxUsage) {
-                this.promoValid = false;
-                this.promoMessage = "❌ Yah, kuota penggunaan kode promo ini sudah habis.";
-                return;
+                this.promoValid = false; this.promoMessage = "❌ Yah, kuota kode promo ini habis."; return;
             }
             
             if (promo.expiresAt) {
                 const expDate = promo.expiresAt.toDate ? promo.expiresAt.toDate() : new Date(promo.expiresAt);
                 if (new Date() > expDate) {
-                    this.promoValid = false;
-                    this.promoMessage = "❌ Kode promo sudah melewati masa berlaku.";
-                    return;
+                    this.promoValid = false; this.promoMessage = "❌ Kode promo sudah kedaluwarsa."; return;
                 }
             }
             
             this.promoValid = true;
             this.appliedPromoDoc = code;
-            
             this.discountAmount = (this.selectedTier.price * promo.discount) / 100;
             this.checkoutTotal = (this.selectedTier.price - this.discountAmount) + this.uniqueCode;
             this.promoMessage = `✅ Berhasil! Diskon ${promo.discount}% diterapkan.`;
@@ -379,7 +323,6 @@ onMessage(messaging, (payload) => {
     async confirmWhatsAppPayment() {
         if (!this.newOrgName.trim()) return alert("Masukkan nama organisasi!");
 
-        // JIKA GRATIS ATAU ADMIN BYPASS (Langsung Buat)
         if (this.checkoutTotal === 0 && !this.appliedPromoDoc) {
             this.appState = 'loading';
             const orgId = "ORG-" + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -402,20 +345,11 @@ onMessage(messaging, (payload) => {
             return;
         }
 
-        // JIKA BAYAR NORMAL & PROSES WA
         const reqId = "REQ-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-        
         let promoText = '';
         if (this.appliedPromoDoc) {
             promoText = `- Kode Promo: *${this.appliedPromoDoc}* (-Rp ${this.discountAmount.toLocaleString('id-ID')})%0A`;
-            
-            try {
-                await updateDoc(doc(db, "promo_codes", this.appliedPromoDoc), {
-                    used: increment(1)
-                });
-            } catch (e) {
-                console.error("Gagal update kuota promo:", e);
-            }
+            try { await updateDoc(doc(db, "promo_codes", this.appliedPromoDoc), { used: increment(1) }); } catch (e) {}
         }
 
         const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
