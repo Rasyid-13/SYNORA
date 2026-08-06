@@ -13,22 +13,18 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// 2. KODE NOTIFIKASI BACKGROUND (FIREBASE)
+// 2. NOTIFIKASI LATAR BELAKANG
 messaging.onBackgroundMessage(function(payload) {
   console.log('[firebase-messaging-sw.js] Notifikasi background diterima ', payload);
-  
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/logo.png', // Pastikan nama icon benar
-    data: payload.data // Bawa data URL jika dikirim dari server
+    icon: '/logo.png' 
   };
-
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-
-// 3. KODE PWA LAMA ANDA (DIGABUNGKAN)
+// 3. KODE INTI PWA (AGAR BISA DI-INSTALL)
 self.addEventListener('install', (e) => {
     self.skipWaiting();
 });
@@ -37,21 +33,25 @@ self.addEventListener('activate', (e) => {
     return self.clients.claim();
 });
 
-// Menangani klik pada notifikasi agar membuka aplikasi kembali dengan cerdas
+// SYARAT MUTLAK PWA: Harus ada event 'fetch' agar Chrome memunculkan tombol Install
+self.addEventListener('fetch', (event) => {
+    // Biarkan browser memproses request jaringan secara normal
+    event.respondWith(fetch(event.request).catch(() => {
+        // Fallback kosong jika offline
+        return new Response("Aplikasi sedang offline.");
+    }));
+});
+
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            // Cek apakah aplikasi SYNORA sudah terbuka di background
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                // Jika sudah terbuka, fokuskan saja layarnya
                 if (client.url.includes(self.location.origin) && 'focus' in client) {
                     return client.focus();
                 }
             }
-            // Jika aplikasi benar-benar tertutup, buka jendela baru ke index
             if (clients.openWindow) {
                 return clients.openWindow('/');
             }
