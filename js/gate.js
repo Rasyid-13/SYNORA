@@ -358,6 +358,7 @@ Alpine.data('synoraGate', () => ({
         const rawMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.\n\n` +
                           `*Detail Pesanan:*\n` +
                           `- Paket: ${this.selectedTier.name}\n` +
+                          `- UID User: ${this.userUid}\n` +
                           `- Nama Org: ${this.newOrgName}\n` +
                           promoText +
                           `- Req ID: ${reqId}\n` +
