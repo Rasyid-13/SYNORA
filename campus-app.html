@@ -394,9 +394,9 @@
         <span :class="getStatusStyle(selectedProker?.status)" class="text-[10px] px-2 py-1 rounded-md font-bold uppercase" x-text="selectedProker?.status"></span>
       </header>
       <div class="flex-1 overflow-y-auto bg-white p-5">
-         <p class="text-xs font-bold text-emerald-600 uppercase mb-1" x-text="'Divisi ' + selectedProker?.division"></p>
-         <h2 class="font-black text-2xl text-gray-800 mb-2" x-text="selectedProker?.title"></h2>
-         <p class="text-gray-600 text-sm whitespace-pre-wrap leading-relaxed mb-6" x-text="selectedProker?.description"></p>
+         <p class="text-xs font-bold text-emerald-600 uppercase mb-1 break-words" x-text="'Divisi ' + selectedProker?.division"></p>
+         <h2 class="font-black text-2xl text-gray-800 mb-2 break-words" x-text="selectedProker?.title"></h2>
+         <p class="text-gray-600 text-sm whitespace-pre-wrap leading-relaxed mb-6 break-all" x-text="selectedProker?.description"></p>
          
          <div x-show="perms.manage_info" class="bg-gray-50 p-4 rounded-2xl border border-gray-200">
             <h3 class="font-bold text-gray-700 text-sm mb-4">Update Progress</h3>
