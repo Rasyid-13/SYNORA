@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SYNORA - Campus & Community</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10b981">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 font-sans antialiased overflow-hidden" x-data="campusApp()">
+
+  <!-- LOADING SCREEN -->
+  <div x-show="appState === 'loading'" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+    <div class="w-24 h-24 bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] mb-6 flex items-center justify-center overflow-hidden animate-pulse border border-gray-50">
+      <img src="logo.png" onerror="this.style.display='none'" class="w-full h-full object-cover" alt="SYNORA">
+    </div>
+    <div class="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+    <p class="mt-4 font-medium text-gray-500 font-mono text-xs">VERIFYING ACCESS...</p>
+  </div>
+
+  <!-- MAIN APP -->
+  <div x-show="appState === 'main'" x-cloak class="flex flex-col h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
+    
+    <!-- HEADER -->
+    <header class="bg-white/90 backdrop-blur-md px-5 py-4 flex justify-between items-center shadow-sm z-30 shrink-0 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-700 text-white rounded-xl flex items-center justify-center font-bold shadow-sm" x-text="activeOrg.name ? activeOrg.name.charAt(0).toUpperCase() : 'C'"></div>
+        <div>
+          <h1 class="font-bold text-gray-800 leading-tight truncate w-40" x-text="activeOrg.name"></h1>
+          <p class="text-[10px] font-bold text-emerald-600 uppercase" x-text="userRole"></p>
+        </div>
+      </div>
+      
+      <div class="relative">
+        <button @click="showMenu = !showMenu" class="p-2 text-gray-500 hover:bg-emerald-50 rounded-full transition active:scale-95">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+        </button>
+        
+        <div x-show="showMenu" @click.away="showMenu = false" x-transition class="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden">
+          <template x-if="activeTab === 'home'">
+            <div>
+              <button @click="switchOrg()" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition border-b border-gray-50"><span>🔄</span> Ganti Organisasi</button>
+              <button x-show="perms.bph" @click="openOrgSettings(); showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition"><span>⚙️</span> Pengaturan Himpunan</button>
+            </div>
+          </template>
+          <!-- Nav 2 Menu: Proker -->
+          <template x-if="activeTab === 'proker'">
+            <div>
+              <button @click="prokerSort = (prokerSort === 'asc' ? 'desc' : 'asc'); showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-b border-gray-50">
+                  <span class="flex items-center gap-3"><span>⏳</span> Urutkan Deadline</span>
+                  <span x-text="prokerSort === 'asc' ? 'Terdekat' : 'Terjauh'" class="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md"></span>
+              </button>
+              <button @click="showArchivedProker = !showArchivedProker; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition">
+                  <span class="flex items-center gap-3"><span>📦</span> Arsip Proker Selesai</span>
+                  <span x-show="showArchivedProker" class="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-1 rounded-md">Aktif</span>
+              </button>
+            </div>
+          </template>
+          <template x-if="activeTab === 'treasury'">
+            <div>
+              <button @click="financeFilter = 'Mingguan'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-b border-gray-50"><span>Mingguan</span> <span x-show="financeFilter==='Mingguan'" class="text-emerald-500 font-bold">✓</span></button>
+              <button @click="financeFilter = 'Bulanan'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition border-b border-gray-50"><span>Bulanan</span> <span x-show="financeFilter==='Bulanan'" class="text-emerald-500 font-bold">✓</span></button>
+              <button @click="financeFilter = 'Tahunan'; showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between transition"><span>Tahunan</span> <span x-show="financeFilter==='Tahunan'" class="text-emerald-500 font-bold">✓</span></button>
+            </div>
+          </template>
+          <template x-if="activeTab === 'sdm'">
+            <div>
+              <button @click="openProfileModal(); showMenu = false" class="w-full text-left px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition border-b border-gray-50"><span>✏️</span> Edit Profil Saya</button>
+              <button x-show="perms.bph" @click="openManageBphModal(); showMenu = false" class="w-full text-left px-5 py-3 text-sm text-emerald-600 font-bold hover:bg-emerald-50 flex items-center gap-3 transition"><span>🏢</span> Kelola Jabatan Mutlak</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 relative z-10 overflow-hidden" id="main-content">
+      
+      <!-- NAV 1: BERANDA -->
+      <section x-show="activeTab === 'home'" class="absolute inset-0 flex flex-col p-4 pb-24 overflow-y-auto">
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <div class="bg-blue-50 p-3 rounded-2xl border border-blue-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xl mb-1">👥</span>
+                <span class="font-black text-blue-700 text-lg" x-text="allMembers.length"></span>
+                <span class="text-[9px] font-bold text-blue-500 uppercase tracking-wider">Anggota</span>
+            </div>
+            <div class="bg-orange-50 p-3 rounded-2xl border border-orange-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xl mb-1">🎯</span>
+                <span class="font-black text-orange-700 text-lg" x-text="prokersList.filter(p => p.status !== 'Completed').length"></span>
+                <span class="text-[9px] font-bold text-orange-500 uppercase tracking-wider">Proker Aktif</span>
+            </div>
+            <div class="bg-purple-50 p-3 rounded-2xl border border-purple-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xl mb-1">🏢</span>
+                <span class="font-black text-purple-700 text-lg" x-text="divisionsList.length"></span>
+                <span class="text-[9px] font-bold text-purple-500 uppercase tracking-wider">Divisi</span>
+            </div>
+        </div>
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="font-bold text-gray-800 text-lg">Papan Pengumuman</h2>
+            <button x-show="perms.manage_info" @click="showAnnounceModal = true" class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition">+ Buat</button>
+        </div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6 flex flex-col gap-3">
+           <template x-for="ann in announcements" :key="ann.id">
+               <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 relative pr-10">
+                   <p class="text-[10px] text-gray-400 mb-1 font-mono uppercase" x-text="formatDate(ann.created_at) + ' • Oleh ' + ann.author_name"></p>
+                   <h3 class="font-bold text-gray-800 mb-1" x-text="ann.title"></h3>
+                   <p class="text-sm text-gray-600 whitespace-pre-wrap" x-text="ann.content"></p>
+                   <button x-show="perms.manage_info" @click="deleteAnnouncement(ann.id)" class="absolute top-4 right-4 text-red-400 hover:text-red-600 active:scale-95 text-lg font-bold">&times;</button>
+               </div>
+           </template>
+           <div x-show="announcements.length === 0" class="text-center text-gray-400 py-4"><p class="text-sm">Belum ada pengumuman.</p></div>
+        </div>
+
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="font-bold text-gray-800 text-lg">Arsip Notulensi Rapat</h2>
+            <button @click="showNotulensiModal = true" class="text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95 transition shadow-sm">Buka Buku ➔</button>
+        </div>
+      </section>
+
+      <!-- NAV 2: PROKER -->
+      <section x-show="activeTab === 'proker'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24 overflow-y-auto bg-gray-100/50">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="font-bold text-gray-800 text-lg">Timeline Proker</h2>
+            <button x-show="perms.manage_info" @click="openAddProker()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm active:scale-95 transition">+ Proker Baru</button>
+        </div>
+        <div class="flex gap-4 overflow-x-auto hide-scrollbar snap-x pb-4">
+            <template x-for="proker in filteredProkers" :key="proker.id">
+                <div @click="openProkerDetail(proker)" class="snap-center shrink-0 w-72 bg-white rounded-3xl shadow-sm border border-gray-100 p-5 cursor-pointer active:scale-95 transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <span :class="getStatusStyle(proker.status)" class="text-[10px] px-2 py-1 rounded-md font-bold uppercase" x-text="proker.status"></span>
+                        <span class="text-xs font-bold text-gray-400" x-text="'Div. ' + proker.division"></span>
+                    </div>
+                    <h3 class="font-bold text-xl text-gray-800 mb-1 line-clamp-1" x-text="proker.title"></h3>
+                    <p class="text-sm text-gray-500 mb-4 line-clamp-2" x-text="proker.description"></p>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mb-1"><div class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" :style="`width: ${proker.progress}%`"></div></div>
+                    <p class="text-[10px] text-right font-bold text-gray-400" x-text="'Progress: ' + proker.progress + '%'"></p>
+                </div>
+            </template>
+            <!-- Tampilan jika kosong -->
+            <div x-show="filteredProkers.length === 0" class="w-full text-center py-10">
+                <p class="text-gray-400 text-sm">Tidak ada program kerja.</p>
+            </div>
+        </div>
+        <div class="mt-2">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wider mb-3">Rekap Status Proker</h3>
+            
+            <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 mb-4">
+                <div class="flex items-center justify-between mb-3 border-b border-gray-50 pb-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                        <span class="text-xs font-bold text-gray-600">Planning (Perencanaan)</span>
+                    </div>
+                    <span class="text-sm font-black text-gray-800" x-text="prokersList.filter(p => p.status === 'Planning').length"></span>
+                </div>
+                <div class="flex items-center justify-between mb-3 border-b border-gray-50 pb-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span class="text-xs font-bold text-gray-600">On-Going (Berjalan)</span>
+                    </div>
+                    <span class="text-sm font-black text-gray-800" x-text="prokersList.filter(p => p.status === 'On-Going').length"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="text-xs font-bold text-gray-600">Completed (Selesai)</span>
+                    </div>
+                    <span class="text-sm font-black text-gray-800" x-text="prokersList.filter(p => p.status === 'Completed').length"></span>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-gray-800 to-gray-900 p-5 rounded-3xl shadow-md text-white relative overflow-hidden flex items-center justify-between">
+                <div class="relative z-10 w-3/4">
+                    <p class="font-bold text-md mb-1">Produktif Terus!</p>
+                    <p class="text-[10px] text-gray-300 leading-relaxed">Pastikan semua program kerja berjalan sesuai dengan tenggat waktu.</p>
+                </div>
+                <div class="text-4xl relative z-10 opacity-80">🚀</div>
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-white opacity-5 rounded-full blur-xl"></div>
+            </div>
+        </div>
+      </section>
+
+      <!-- NAV 3: KEUANGAN -->
+      <section x-show="activeTab === 'treasury'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24 overflow-y-auto">
+        <div class="bg-gradient-to-br from-emerald-600 to-teal-800 p-6 rounded-3xl shadow-lg text-white mb-4 relative overflow-hidden">
+            <div class="absolute -right-6 -top-6 w-36 h-36 bg-white opacity-10 rounded-full blur-2xl"></div>
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-xs opacity-80 mb-1">Total Kas Keseluruhan</p>
+                        <h2 class="text-3xl font-black tracking-tight" x-text="formatRupiah(totalKas)"></h2>
+                    </div>
+                    <!-- Tombol cetak dihapus dari sini -->
+                </div>
+                
+                <div class="pt-3 border-t border-white/10 mt-2 flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-lg text-emerald-100" x-text="'Periode: ' + financeFilter"></span>
+                    <span class="text-[10px] opacity-75 font-mono" x-text="filteredFinanceList.length + ' Transaksi Tercatat'"></span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white/10 p-3.5 rounded-2xl backdrop-blur-sm border border-white/5">
+                        <p class="text-[10px] opacity-75 mb-0.5">Masuk (<span x-text="financeFilter"></span>)</p>
+                        <p class="font-bold text-sm text-green-300" x-text="'+' + formatRupiah(filteredTotalIn)"></p>
+                    </div>
+                    <div class="bg-white/10 p-3.5 rounded-2xl backdrop-blur-sm border border-white/5">
+                        <p class="text-[10px] opacity-75 mb-0.5">Keluar (<span x-text="financeFilter"></span>)</p>
+                        <p class="font-bold text-sm text-red-300" x-text="'-' + formatRupiah(filteredTotalOut)"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="font-bold text-gray-700">Riwayat Mutasi</h3>
+            <button x-show="perms.manage_finance" @click="openTxForm()" class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95 transition shadow-sm">+ Catat Kas</button>
+        </div>
+
+        <div class="space-y-3">
+            <template x-for="tx in filteredFinanceList" :key="tx.id">
+                <div @click="openTxDetail(tx)" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-95 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg" :class="tx.type === 'in' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'">
+                            <span x-text="tx.type === 'in' ? '+' : '-'"></span>
+                        </div>
+                        <div>
+                            <p class="font-bold text-sm text-gray-800 line-clamp-1" x-text="tx.title"></p>
+                            <p class="text-[10px] text-gray-400 font-mono" x-text="formatDate(tx.date) + ' • Oleh: ' + tx.author_name"></p>
+                        </div>
+                    </div>
+                    <p class="font-bold text-sm" :class="tx.type === 'in' ? 'text-green-600' : 'text-red-600'" x-text="(tx.type === 'in' ? '+' : '-') + formatRupiah(tx.total)"></p>
+                </div>
+            </template>
+            <div x-show="filteredFinanceList.length === 0" class="w-full text-center py-10">
+                <p class="text-gray-400 text-sm">Tidak ada transaksi pada periode ini.</p>
+            </div>
+        </div>
+      </section>
+
+      <!-- NAV 4: SDM -->
+      <section x-show="activeTab === 'sdm'" x-cloak class="absolute inset-0 flex flex-col p-4 pb-24 overflow-y-auto">
+        
+        <div class="flex items-center gap-4 bg-white p-5 rounded-3xl shadow-sm mb-6 border border-emerald-100 relative">
+          <div class="absolute top-4 right-4 text-xs font-bold text-gray-300">ANDA</div>
+          <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-2xl border-2 border-emerald-200"><span x-text="userName ? userName.charAt(0).toUpperCase() : 'U'"></span></div>
+          <div class="flex-1">
+            <h2 class="font-bold text-xl text-gray-800 truncate w-48" x-text="userName || 'Nama Anda'"></h2>
+            <p class="text-xs text-emerald-600 font-bold mt-1 bg-emerald-50 inline-block px-2 py-1 rounded-md" x-text="userRole + (userDivisi ? ' ' + userDivisi : '')"></p>
+          </div>
+        </div>
+<div class="bg-gray-800 p-4 rounded-2xl shadow-md mb-6 flex justify-between items-center relative overflow-hidden">
+            <div class="absolute -right-4 -top-4 w-16 h-16 bg-white opacity-5 rounded-full blur-xl"></div>
+            <div>
+                <p class="text-[10px] text-gray-300 font-bold uppercase tracking-wider mb-0.5">Kode Undangan (ID)</p>
+                <p class="font-mono font-bold text-white text-sm tracking-wide" x-text="activeOrg.id"></p>
+            </div>
+            <!-- Tombol Copy -->
+            <button @click="copyOrgId()" class="bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition flex items-center gap-2 backdrop-blur-sm border border-white/10">
+                <span x-text="copied ? '✓ Tersalin' : '📋 Salin ID'"></span>
+            </button>
+        </div>
+        <h3 class="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wider">Jajaran Inti (BPH)</h3>
+        <div class="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-4 mb-2">
+            <template x-for="bph in bphMembers" :key="bph.uid">
+                <div class="snap-center shrink-0 w-40 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-gray-100 rounded-full mb-2 flex items-center justify-center font-bold text-gray-500 text-lg">
+                        <span x-text="bph.name.charAt(0).toUpperCase()"></span>
+                    </div>
+                    <h4 class="font-bold text-sm text-gray-800 line-clamp-1" x-text="bph.name"></h4>
+                    <p class="text-[10px] text-emerald-600 font-bold uppercase" x-text="bph.role_name"></p>
+                </div>
+            </template>
+            <div x-show="bphMembers.length === 0" class="text-xs text-gray-400 italic py-2 px-2">BPH belum diatur</div>
+        </div>
+
+        <div class="flex justify-between items-center mb-3 mt-2">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wider">Divisi & Anggota</h3>
+            <button x-show="perms.bph" @click="openAddDivisionModal()" class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold shadow-sm active:scale-95">+ Buat Divisi</button>
+        </div>
+        
+        <div class="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-4">
+            <template x-for="div in divisionsList" :key="div.name">
+                <div @click="openDivisionDetail(div)" class="snap-center shrink-0 w-56 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-95 transition">
+                    <h4 class="font-bold text-md text-gray-800 mb-1" x-text="'Divisi ' + div.name"></h4>
+                    <p class="text-xs text-gray-500 mb-3" x-text="'Kepala: ' + (div.headName || 'Belum diisi')"></p>
+                    <div class="flex items-center gap-1">
+                        <template x-for="i in Math.min(3, div.memberCount)">
+                            <div class="w-6 h-6 bg-gray-200 border-2 border-white rounded-full" :class="i > 1 ? '-ml-3' : ''"></div>
+                        </template>
+                        <span class="text-[10px] text-gray-400 ml-1 font-bold" x-text="(div.memberCount || 0) + ' Anggota'"></span>
+                    </div>
+                    <p x-show="(perms.manage_divisi && userDivisi === div.name) || perms.bph" class="text-[9px] text-blue-500 font-bold mt-3">Ketuk untuk Kelola Anggota ➔</p>
+                </div>
+            </template>
+            <div x-show="divisionsList.length === 0" class="text-xs text-gray-400 italic py-2 px-2 w-full text-center">Belum ada divisi yang dibentuk.</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="fixed bottom-0 w-full h-20 bg-white border-t border-gray-100 flex justify-around items-center px-2 pb-2 z-50 shrink-0">
+      <button @click="switchTab('home')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'home' ? 'text-emerald-600' : 'text-gray-400'"><div :class="activeTab === 'home' ? 'bg-emerald-50 px-4 py-1.5 rounded-2xl' : 'px-4 py-1.5'">📢</div><span class="text-[10px] mt-1 font-bold">Beranda</span></button>
+      <button @click="switchTab('proker')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'proker' ? 'text-emerald-600' : 'text-gray-400'"><div :class="activeTab === 'proker' ? 'bg-emerald-50 px-4 py-1.5 rounded-2xl' : 'px-4 py-1.5'">🎯</div><span class="text-[10px] mt-1 font-bold">Proker</span></button>
+      <button @click="switchTab('treasury')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'treasury' ? 'text-emerald-600' : 'text-gray-400'"><div :class="activeTab === 'treasury' ? 'bg-emerald-50 px-4 py-1.5 rounded-2xl' : 'px-4 py-1.5'">📊</div><span class="text-[10px] mt-1 font-bold">Keuangan</span></button>
+      <button @click="switchTab('sdm')" class="flex flex-col items-center p-2 w-16" :class="activeTab === 'sdm' ? 'text-emerald-600' : 'text-gray-400'"><div :class="activeTab === 'sdm' ? 'bg-emerald-50 px-4 py-1.5 rounded-2xl' : 'px-4 py-1.5'">👥</div><span class="text-[10px] mt-1 font-bold">SDM</span></button>
+    </nav>
+    
+    <!-- SEMUA MODAL -->
+    <!-- Notulensi -->
+    <div x-show="showNotulensiModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showNotulensiModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Tutup</button>
+        <button x-show="notulensiMode === 'list' && perms.manage_info" @click="notulensiMode = 'edit'; noteForm = {id: null, title: '', date: '', content: ''}" class="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition">+ Catat Rapat</button>
+      </header>
+      <div x-show="notulensiMode === 'list'" class="flex-1 overflow-y-auto p-4 space-y-3">
+         <template x-for="note in notesList" :key="note.id">
+           <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 relative transition">
+             <div class="pr-14 mb-2"><h3 class="font-bold text-gray-800 text-lg leading-tight" x-text="note.title"></h3><p class="text-xs text-emerald-600 font-bold mt-1" x-text="formatDate(note.date)"></p></div>
+             <button @click="notulensiMode = 'read'; selectedNote = note" class="absolute top-5 right-5 text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-xl font-bold transition">Buka</button>
+             <p class="text-sm text-gray-500 whitespace-pre-wrap line-clamp-2 mt-2" x-text="note.content"></p>
+           </div>
+         </template>
+      </div>
+      <div x-show="notulensiMode === 'edit'" class="flex-1 flex flex-col p-4 bg-white">
+         <input x-model="noteForm.title" type="text" placeholder="Judul Rapat..." class="w-full px-4 py-4 rounded-xl border border-gray-200 outline-none font-bold mb-3 bg-gray-50">
+         <textarea x-model="noteForm.content" placeholder="Hasil keputusan..." class="w-full flex-1 p-4 rounded-xl border border-gray-200 outline-none resize-none bg-gray-50"></textarea>
+         <div class="flex gap-2 mt-4 shrink-0">
+           <button @click="notulensiMode = 'list'" class="w-1/3 bg-gray-100 text-gray-600 font-bold py-4 rounded-xl">Batal</button>
+           <button @click="saveNotulensi()" class="w-2/3 bg-emerald-600 text-white font-bold py-4 rounded-xl">Simpan</button>
+         </div>
+      </div>
+      <div x-show="notulensiMode === 'read'" class="flex-1 flex flex-col bg-white">
+         <div class="p-5 border-b border-gray-100 bg-gray-50"><h2 class="font-black text-2xl mb-2" x-text="selectedNote?.title"></h2></div>
+         <div class="flex-1 overflow-y-auto p-5"><p class="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed" x-text="selectedNote?.content"></p></div>
+         <div class="p-4 bg-gray-50"><button @click="notulensiMode = 'list'" class="w-full bg-white border border-gray-200 text-gray-700 font-bold py-3 rounded-xl shadow-sm">Kembali</button></div>
+      </div>
+    </div>
+
+    <!-- Modal Pengumuman -->
+    <div x-show="showAnnounceModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showAnnounceModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Batal</button>
+        <h2 class="font-bold text-gray-800 text-lg">Buat Pengumuman</h2>
+        <div class="w-10"></div>
+      </header>
+      <div class="flex-1 flex flex-col p-4 bg-white">
+         <input x-model="announceForm.title" type="text" placeholder="Judul Pengumuman..." class="w-full px-4 py-4 rounded-xl border border-gray-200 outline-none font-bold mb-3 bg-gray-50">
+         <textarea x-model="announceForm.content" placeholder="Isi detail pengumuman..." class="w-full flex-1 p-4 rounded-xl border border-gray-200 outline-none resize-none bg-gray-50 text-gray-700"></textarea>
+         <button @click="saveAnnouncement()" class="w-full mt-4 bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Sebarkan Pengumuman</button>
+      </div>
+    </div>
+
+    <!-- Modal Settings -->
+    <div x-show="showOrgSettingsModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showOrgSettingsModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Kembali</button>
+        <h2 class="font-bold text-gray-800 text-lg">Pengaturan</h2>
+        <div class="w-10"></div>
+      </header>
+      <div class="p-4 bg-white flex-1">
+         <label class="text-xs font-bold text-gray-500 mb-1 ml-1">Nama Organisasi / Himpunan</label>
+         <input x-model="orgSettingsForm.name" type="text" class="w-full px-4 py-4 rounded-xl border border-gray-200 outline-none font-bold mb-6 bg-gray-50">
+         <button @click="saveOrgSettings()" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Simpan Perubahan</button>
+      </div>
+    </div>
+
+    <!-- Modal Form Proker -->
+    <div x-show="showProkerFormModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showProkerFormModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Batal</button>
+        <h2 class="font-bold text-gray-800 text-lg">Data Proker</h2>
+        <div class="w-10"></div>
+      </header>
+      <div class="flex-1 overflow-y-auto p-4 bg-white flex flex-col gap-3">
+         <input x-model="prokerForm.title" type="text" placeholder="Nama Proker" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold bg-gray-50">
+         <input x-model="prokerForm.division" type="text" placeholder="Divisi Pelaksana" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50 text-sm">
+         <textarea x-model="prokerForm.description" placeholder="Deskripsi Proker" class="w-full h-24 p-4 rounded-xl border border-gray-200 outline-none resize-none bg-gray-50 text-sm"></textarea>
+         <input x-model="prokerForm.deadline" type="date" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50 text-sm">
+         <button @click="saveProker()" class="w-full mt-4 bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Simpan Proker</button>
+      </div>
+    </div>
+
+    <!-- Modal Detail Proker -->
+    <div x-show="showProkerDetailModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showProkerDetailModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Kembali</button>
+        <span :class="getStatusStyle(selectedProker?.status)" class="text-[10px] px-2 py-1 rounded-md font-bold uppercase" x-text="selectedProker?.status"></span>
+      </header>
+      <div class="flex-1 overflow-y-auto bg-white p-5">
+         <p class="text-xs font-bold text-emerald-600 uppercase mb-1" x-text="'Divisi ' + selectedProker?.division"></p>
+         <h2 class="font-black text-2xl text-gray-800 mb-2" x-text="selectedProker?.title"></h2>
+         <p class="text-gray-600 text-sm whitespace-pre-wrap leading-relaxed mb-6" x-text="selectedProker?.description"></p>
+         
+         <div x-show="perms.manage_info" class="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+            <h3 class="font-bold text-gray-700 text-sm mb-4">Update Progress</h3>
+            <select x-model="selectedProkerUpdate.status" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none bg-white text-sm mb-4">
+                <option value="Planning">Planning (Perencanaan)</option>
+                <option value="On-Going">On-Going (Sedang Berjalan)</option>
+                <option value="Completed">Completed (Selesai)</option>
+            </select>
+            <input x-model="selectedProkerUpdate.progress" type="range" min="0" max="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mb-4">
+            <div class="flex gap-2">
+                <button @click="deleteProker(selectedProker?.id)" class="w-1/3 bg-red-50 text-red-600 font-bold py-3 rounded-xl text-sm">Hapus</button>
+                <button @click="updateProkerData()" class="w-2/3 bg-emerald-600 text-white font-bold py-3 rounded-xl text-sm">Simpan</button>
+            </div>
+         </div>
+      </div>
+    </div>
+
+    <!-- Modal Form Kas -->
+    <div x-show="showTxFormModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showTxFormModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Batal</button>
+        <h2 class="font-bold text-gray-800 text-lg">Catat Transaksi</h2>
+        <div class="w-10"></div>
+      </header>
+      <div class="flex-1 overflow-y-auto p-4 bg-white flex flex-col gap-3">
+         <div class="flex bg-gray-100 p-1 rounded-xl mb-2">
+             <button @click="txForm.type = 'in'" :class="txForm.type === 'in' ? 'bg-white shadow-sm text-green-600' : 'text-gray-500'" class="flex-1 py-2 text-sm font-bold rounded-lg transition">Pemasukan</button>
+             <button @click="txForm.type = 'out'" :class="txForm.type === 'out' ? 'bg-white shadow-sm text-red-600' : 'text-gray-500'" class="flex-1 py-2 text-sm font-bold rounded-lg transition">Pengeluaran</button>
+         </div>
+         <input x-model="txForm.title" type="text" placeholder="Keterangan Umum (Judul)" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold bg-gray-50 mb-2">
+         
+         <div class="flex justify-between items-center mt-2 border-b border-gray-100 pb-2">
+             <label class="text-xs font-bold text-gray-800">Rincian</label>
+             <button @click="addTxItem()" class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">+ Tambah</button>
+         </div>
+         <template x-for="(item, index) in txForm.items" :key="index">
+             <div class="flex items-center gap-2 mb-2">
+                 <input x-model="item.desc" type="text" placeholder="Nama Rincian..." class="w-1/2 px-3 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50 text-xs">
+                 <input x-model.number="item.amount" type="number" placeholder="Rp 0" class="w-1/3 px-3 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50 text-xs font-bold text-right">
+                 <button @click="removeTxItem(index)" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-xl font-bold active:scale-95" x-show="txForm.items.length > 1">&times;</button>
+             </div>
+         </template>
+
+         <div class="mt-4 p-4 rounded-xl bg-gray-800 text-white flex justify-between items-center shadow-md">
+             <span class="text-xs font-bold opacity-80">Total:</span>
+             <span class="text-lg font-black tracking-wide" x-text="formatRupiah(txFormTotal)"></span>
+         </div>
+         <button @click="saveTransaction()" class="w-full mt-4 bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Simpan Kas</button>
+      </div>
+    </div>
+
+    <!-- Modal Edit Profil Diri -->
+    <div x-show="showProfileModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+        <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+            <button @click="showProfileModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Batal</button>
+            <h2 class="font-bold text-gray-800 text-lg">Edit Profil</h2>
+            <div class="w-10"></div>
+        </header>
+        <div class="flex-1 p-4 bg-white overflow-y-auto">
+            <label class="text-xs font-bold text-gray-500 ml-1">Nama Lengkap</label>
+            <input x-model="profileForm.name" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold bg-gray-50 mb-4">
+            
+            <label class="text-xs font-bold text-gray-500 ml-1">Kontak (Email / No HP)</label>
+            <input x-model="profileForm.contact" type="text" placeholder="Masukkan kontak yang bisa dihubungi" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50 mb-6 text-sm">
+            
+            <div class="p-4 bg-yellow-50 rounded-xl border border-yellow-100 mb-6">
+                <label class="text-xs font-bold text-yellow-700 mb-2 block">Ubah Password (Opsional)</label>
+                <input x-model="profileForm.password" type="password" placeholder="Biarkan kosong jika tidak diubah" class="w-full px-4 py-3 rounded-xl border border-white outline-none bg-white text-sm mb-2 shadow-sm focus:border-yellow-400">
+                <p class="text-[10px] text-yellow-600 leading-tight">Catatan: Jika Anda sudah login terlalu lama, sistem mungkin akan meminta Anda login ulang untuk dapat mengubah password.</p>
+            </div>
+
+            <button @click="saveProfile()" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Simpan Perubahan</button>
+        </div>
+    </div>
+
+    <!-- Modal Kelola Jabatan BPH Mutlak -->
+    <div x-show="showManageBphModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+        <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+            <button @click="showManageBphModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Tutup</button>
+            <h2 class="font-bold text-gray-800 text-lg">Formasi BPH</h2><div class="w-10"></div>
+        </header>
+        <div class="flex-1 overflow-y-auto p-4 bg-white">
+            <p class="text-xs text-gray-500 mb-4">Pengangkatan struktur inti organisasi.</p>
+            
+            <!-- Posisi: Wakil Ketua (1 Slot) -->
+            <div class="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <label class="text-sm font-bold text-emerald-700 mb-2 block uppercase tracking-wide">Wakil Ketua</label>
+                <select x-model="bphAssignments['Wakil Ketua'][0]" class="w-full px-3 py-3 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold">
+                    <option value="">-- Kosongkan / Pilih Anggota --</option>
+                    <template x-for="member in allMembers" :key="member.uid">
+                        <option x-show="member.role_name !== 'Ketua' && member.role_name !== 'Head'" :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Posisi: Sekretaris (2 Slot) -->
+            <div class="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <label class="text-sm font-bold text-emerald-700 mb-2 block uppercase tracking-wide">Sekretaris (Bisa 2 Orang)</label>
+                <select x-model="bphAssignments['Sekretaris'][0]" class="w-full px-3 py-3 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold mb-2">
+                    <option value="">-- Sekretaris 1 (Utama) --</option>
+                    <template x-for="member in allMembers" :key="'sec1'+member.uid">
+                        <option x-show="member.role_name !== 'Ketua' && member.role_name !== 'Head'" :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+                <select x-model="bphAssignments['Sekretaris'][1]" class="w-full px-3 py-3 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold">
+                    <option value="">-- Sekretaris 2 (Wakil) --</option>
+                    <template x-for="member in allMembers" :key="'sec2'+member.uid">
+                        <option x-show="member.role_name !== 'Ketua' && member.role_name !== 'Head'" :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Posisi: Bendahara (2 Slot) -->
+            <div class="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <label class="text-sm font-bold text-emerald-700 mb-2 block uppercase tracking-wide">Bendahara (Bisa 2 Orang)</label>
+                <select x-model="bphAssignments['Bendahara'][0]" class="w-full px-3 py-3 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold mb-2">
+                    <option value="">-- Bendahara 1 (Utama) --</option>
+                    <template x-for="member in allMembers" :key="'ben1'+member.uid">
+                        <option x-show="member.role_name !== 'Ketua' && member.role_name !== 'Head'" :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+                <select x-model="bphAssignments['Bendahara'][1]" class="w-full px-3 py-3 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold">
+                    <option value="">-- Bendahara 2 (Wakil) --</option>
+                    <template x-for="member in allMembers" :key="'ben2'+member.uid">
+                        <option x-show="member.role_name !== 'Ketua' && member.role_name !== 'Head'" :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+            </div>
+
+            <button @click="saveBphRoles()" class="w-full mt-4 bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Sah kan Formasi</button>
+        </div>
+    </div>
+
+    <!-- Modal Buat Divisi Baru -->
+    <div x-show="showAddDivisionModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+         <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+            <button @click="showAddDivisionModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Batal</button>
+            <h2 class="font-bold text-gray-800 text-lg">Divisi Baru</h2><div class="w-10"></div>
+        </header>
+        <div class="p-4 bg-white flex-1">
+            <label class="text-xs font-bold text-gray-500 ml-1">Nama Divisi</label>
+            <input x-model="newDivisionName" type="text" placeholder="Misal: Humas" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none font-bold bg-gray-50 mb-6">
+            <button @click="saveNewDivision()" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-95 transition">Buat Divisi</button>
+        </div>
+    </div>
+
+    <!-- Modal Detail & Kelola Divisi (BPH & Kadiv) -->
+    <div x-show="showDivisionDetailModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+        <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+            <button @click="showDivisionDetailModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Kembali</button>
+            <h2 class="font-bold text-gray-800 text-lg" x-text="'Divisi ' + selectedDivision?.name"></h2>
+             <button x-show="perms.bph" @click="deleteDivision(selectedDivision?.name)" class="text-red-500 active:scale-95 font-bold text-2xl">&times;</button>
+             <div x-show="!perms.bph" class="w-5"></div>
+        </header>
+        
+        <div class="flex-1 overflow-y-auto bg-white p-4">
+            <div x-show="perms.bph" class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <label class="text-xs font-bold text-gray-500 mb-2 block uppercase tracking-wider">Atur Kepala Divisi</label>
+                <div class="flex gap-2">
+                    <select x-model="selectedDivisionUpdate.headUid" class="flex-1 px-3 py-2 rounded-lg border border-gray-200 outline-none bg-white text-sm font-bold">
+                        <option value="">-- Belum ada Kadiv --</option>
+                        <template x-for="member in availableMembersForDivision" :key="member.uid">
+                            <option :value="member.uid" x-text="member.name"></option>
+                        </template>
+                    </select>
+                    <button @click="setDivisionHead()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm active:scale-95">Set</button>
+                </div>
+            </div>
+
+            <div x-show="!perms.bph" class="mb-6 p-4 rounded-xl border border-emerald-100 bg-emerald-50 text-center">
+                 <p class="text-[10px] text-emerald-600 font-bold mb-1 uppercase tracking-wider">Kepala Divisi</p>
+                 <p class="font-bold text-gray-800 text-lg" x-text="selectedDivision?.headName || 'Belum diisi'"></p>
+            </div>
+
+            <div class="flex justify-between items-center mb-3 border-b border-gray-100 pb-2">
+                <h3 class="font-bold text-gray-700">Anggota Divisi</h3>
+                <button x-show="(perms.manage_divisi && userDivisi === selectedDivision?.name) || perms.bph" @click="showAddMemberToDiv = !showAddMemberToDiv" class="text-[10px] bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-md font-bold active:scale-95 transition">+ Tambah</button>
+            </div>
+
+            <div x-show="showAddMemberToDiv" class="mb-4 flex gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                 <select x-model="newMemberForDivUid" class="flex-1 px-3 py-2 rounded-lg border border-gray-200 outline-none bg-white text-sm">
+                    <option value="">Pilih Anggota Bebas...</option>
+                    <template x-for="member in membersWithoutDivision" :key="member.uid">
+                        <option :value="member.uid" x-text="member.name"></option>
+                    </template>
+                </select>
+                <button @click="addMemberToDivision()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold active:scale-95 shadow-sm">Add</button>
+            </div>
+
+            <div class="space-y-2">
+                <template x-for="member in selectedDivisionMembers" :key="member.uid">
+                    <div class="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
+                        <span class="text-sm font-bold text-gray-700" x-text="member.name"></span>
+                        <button x-show="(perms.manage_divisi && userDivisi === selectedDivision?.name) || perms.bph" @click="removeMemberFromDivision(member.uid)" class="text-[10px] text-red-500 bg-red-50 px-2 py-1.5 rounded-md font-bold active:scale-95 transition">Keluarkan</button>
+                    </div>
+                </template>
+                <div x-show="selectedDivisionMembers.length === 0" class="text-center py-6 text-xs text-gray-400 italic">Divisi ini belum memiliki anggota.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detail Transaksi -->
+    <div x-show="showTxDetailModal" x-cloak class="fixed inset-0 bg-gray-50 z-[105] flex flex-col">
+      <header class="bg-white px-4 py-4 flex justify-between items-center shadow-sm shrink-0 border-b border-gray-100">
+        <button @click="showTxDetailModal = false" class="text-gray-500 font-bold text-xl active:scale-95">&larr; Kembali</button>
+        <button x-show="perms.manage_finance" @click="deleteTransaction(selectedTx?.id)" class="text-red-500 active:scale-95">🗑️</button>
+      </header>
+      <div class="flex-1 overflow-y-auto bg-white p-5">
+         <div class="text-center mb-6">
+             <div class="inline-block px-3 py-1 rounded-full text-[10px] font-bold mb-2 uppercase" 
+                  :class="selectedTx?.type === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  x-text="selectedTx?.type === 'in' ? 'Pemasukan' : 'Pengeluaran'"></div>
+             <h2 class="font-black text-2xl text-gray-800 mb-1" x-text="selectedTx?.title"></h2>
+         </div>
+         <div class="space-y-3 mb-6">
+             <template x-for="(item, idx) in selectedTx?.items" :key="idx">
+                 <div class="flex justify-between items-center text-sm border-b border-dashed border-gray-200 pb-2">
+                     <span class="text-gray-600" x-text="item.desc"></span>
+                     <span class="font-bold text-gray-800" x-text="formatRupiah(item.amount)"></span>
+                 </div>
+             </template>
+         </div>
+         <div class="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100">
+             <span class="font-bold text-gray-600">Total Keseluruhan</span>
+             <span class="font-black text-xl" :class="selectedTx?.type === 'in' ? 'text-green-600' : 'text-red-600'" x-text="formatRupiah(selectedTx?.total)"></span>
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/campus-app.js"></script>
+</body>
+</html>
