@@ -1,3 +1,5 @@
+import { messaging } from './firebase-config.js';
+import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
 import { auth, db } from './firebase-config.js';
 import { RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -38,7 +40,9 @@ Alpine.data('synoraGate', () => ({
 
     tiers: [
         { id: 'family', type: 'Family', name: 'Family Hub', tagline: 'Fondasi digital untuk keluarga Anda.', price: 0, period: 'Free forever', icon: '🏡', placeholder: 'Keluarga Cemara' },
-        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline: 'Manajemen proker dan himpunan.', price: 180000, period: 'per 6 months', icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
+        { id: 'campus', type: 'Campus', name: 'Campus & Community', tagline:
+        'Manajemen proker dan himpunan.', price: 180000, period: 'per 6 months',
+        icon: '🎓', placeholder: 'BEM Fakultas Teknik' },
         { id: 'esports', type: 'Esports', name: 'E-Sports Team', tagline: 'Manajemen drafting & kompetitif.', price: 149000, period: 'per month', icon: '🎮', placeholder: 'Rex Regum Qeon' },
         { id: 'traders', type: 'Traders', name: 'Traders Hub', tagline: 'Jurnal trading & manajemen margin.', price: 199000, period: 'per month', icon: '📈', placeholder: 'Alpha Syndicate' },
         { id: 'business', type: 'Business', name: 'Business & SME', tagline: 'Sistem pencatatan audit korporat.', price: 299000, period: 'per month', icon: '🏢', placeholder: 'PT Maju Bersama' }
@@ -144,6 +148,43 @@ Alpine.data('synoraGate', () => ({
             await updateDoc(doc(db, "users", this.userUid), { joined_organizations: validOrgIds });
         }
     },
+async function aktifkanNotifikasi(userUid) {
+    try {
+        // Minta izin ke HP/Browser pengguna
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            console.log('Izin Notifikasi Diberikan!');
+            
+            // Dapatkan Token Perangkat (Ganti 'VAPID_KEY_ANDA' dari Firebase Console)
+            // Cara dapet VAPID: Project Settings -> Cloud Messaging -> Web configuration -> Generate Key pair
+            const token = await getToken(messaging, { 
+                vapidKey:
+                'BHT5eoQ7VXyq8nbgY60noV-wcYAn0WzOEbscj4lh69mbIL1fAHm2oYeRL76L5gdEmhdazeAqol7i76G94fu96jg'
+                
+            });
+            
+            if (token) {
+                // Simpan token ini ke database user agar admin bisa ngirim notif ke dia
+                await updateDoc(doc(db, "users", userUid), {
+                    fcmToken: token
+                });
+                console.log("Token Notifikasi Tersimpan:", token);
+            }
+        } else {
+            console.log('Izin Notifikasi Ditolak.');
+        }
+    } catch (error) {
+        console.error('Gagal mengaktifkan notifikasi:', error);
+    }
+}
+
+// Menangkap notifikasi saat aplikasi sedang dibuka (Foreground)
+onMessage(messaging, (payload) => {
+    console.log('Notifikasi masuk saat app dibuka:', payload);
+    // Munculkan popup bawaan browser
+    alert(`📢 ${payload.notification.title}\n${payload.notification.body}`);
+});
 
     // --- FITUR JOIN ORGANISASI ---
     async joinOrg() {
@@ -377,12 +418,11 @@ Alpine.data('synoraGate', () => ({
             }
         }
 
-                const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
+        const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
                           `*Detail Pesanan:*%0A` +
                           `- Paket: ${this.selectedTier.name}%0A` +
                           `- Nama Org: ${this.newOrgName}%0A` +
                           promoText +
-                          `- UID: ${this.userUid}%0A` +  // <--- INI BARIS TAMBAHANNYA
                           `- Req ID: ${reqId}%0A` +
                           `- Total Bayar: *Rp ${this.checkoutTotal.toLocaleString('id-ID')}*%0A%0A` +
                           `Berikut bukti transfer saya:`;
