@@ -346,26 +346,32 @@ Alpine.data('synoraGate', () => ({
         }
 
         const reqId = "REQ-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        
         let promoText = '';
         if (this.appliedPromoDoc) {
-            promoText = `- Kode Promo: *${this.appliedPromoDoc}* (-Rp ${this.discountAmount.toLocaleString('id-ID')})%0A`;
+            // Gunakan \n bukan %0A
+            promoText = `- Kode Promo: *${this.appliedPromoDoc}* (-Rp ${this.discountAmount.toLocaleString('id-ID')})\n`;
             try { await updateDoc(doc(db, "promo_codes", this.appliedPromoDoc), { used: increment(1) }); } catch (e) {}
         }
 
-        const waMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.%0A%0A` +
-                          `*Detail Pesanan:*%0A` +
-                          `- Paket: ${this.selectedTier.name}%0A` +
-                          `- Nama Org: ${this.newOrgName}%0A` +
+        // Susun teks dengan \n (enter asli), jauh lebih rapi dibaca di kode
+        const rawMessage = `Halo Admin SYNORA, saya ingin konfirmasi pembayaran langganan aplikasi.\n\n` +
+                          `*Detail Pesanan:*\n` +
+                          `- Paket: ${this.selectedTier.name}\n` +
+                          `- Nama Org: ${this.newOrgName}\n` +
                           promoText +
-                          `- Req ID: ${reqId}%0A` +
-                          `- Total Bayar: *Rp ${this.checkoutTotal.toLocaleString('id-ID')}*%0A%0A` +
+                          `- Req ID: ${reqId}\n` +
+                          `- Total Bayar: *Rp ${this.checkoutTotal.toLocaleString('id-ID')}*\n\n` +
                           `Berikut bukti transfer saya:`;
 
-        const waUrl = `https://wa.me/${ADMIN_WA_NUMBER}?text=${waMessage}`;
+        // Gunakan encodeURIComponent agar simbol '&' dan lainnya tidak memotong link
+        const waUrl = `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(rawMessage)}`;
+        
         window.open(waUrl, '_blank');
         
         this.showCheckout = false;
         alert("Terima kasih! Pesanan diproses. Admin akan menghubungi Anda untuk aktivasi.");
+
     }
 }));
 
